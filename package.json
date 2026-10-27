@@ -1,0 +1,15 @@
+{
+  "name": "bimviewer",
+  "version": "0.1.0",
+  "description": "Browser tool that reads Revit (.rvt), IFC and classified point-cloud scan files and shows what is inside them.",
+  "private": true,
+  "scripts": {
+    "build": "python3 build.py",
+    "test": "node tests/tifc.js && node tests/tqa.js",
+    "test:browser": "node tests/pw8.js"
+  },
+  "devDependencies": {
+    "pako": "1.0.11",
+    "playwright": "^1.47.0"
+  }
+}

@@ -1,0 +1,859 @@
+<title>BIM File Reader</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working column. Drop zone on top, result sections below, each with its own copy-as-CSV control. */
+:root {
+  --bg: #eef1f3;
+  --surface: #ffffff;
+  --fg: #15222b;
+  --muted: #5a6b76;
+  --rule: #d3dbe0;
+  --accent: #0a6a85;
+  --accent-soft: #dcecf1;
+  --warn-bg: #fbf1d9;
+  --warn-fg: #5d4506;
+  --bar: #7fb6c6;
+  --font-ui: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f171c; --surface: #162029; --fg: #e3eaee; --muted: #93a5b0; --rule: #2a3944;
+    --accent: #62c1dc; --accent-soft: #1b3440; --warn-bg: #3a3118; --warn-fg: #f1dca0; --bar: #3f7f93;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f171c; --surface: #162029; --fg: #e3eaee; --muted: #93a5b0; --rule: #2a3944;
+  --accent: #62c1dc; --accent-soft: #1b3440; --warn-bg: #3a3118; --warn-fg: #f1dca0; --bar: #3f7f93;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--font-ui); font-size: 16px; line-height: 1.5;
+  padding-block: 28px 64px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+h1 { font-size: 1.9rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+h2 { font-size: 1.15rem; font-weight: 600; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 68ch; margin-top: 6px; }
+.mono, td.mono, .num { font-family: var(--font-data); font-size: 0.85rem; }
+.num { font-variant-numeric: tabular-nums; }
+
+.drop {
+  background: var(--surface); border: 1.5px dashed var(--accent); border-radius: 6px; padding: 18px;
+  display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; justify-content: space-between;
+}
+.drop.over { background: var(--accent-soft); }
+.drop strong { font-weight: 600; }
+.drop .hint { color: var(--muted); font-size: 0.92rem; }
+button, .btn {
+  font: inherit; font-weight: 500; cursor: pointer; border-radius: 4px; padding: 8px 14px;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--surface);
+}
+button.ghost { background: transparent; color: var(--accent); }
+button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#file, #dir { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.progress { height: 6px; background: var(--rule); border-radius: 3px; overflow: hidden; }
+.progress > div { height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+.status { font-size: 0.92rem; color: var(--muted); min-height: 1.4em; }
+.status.err { color: #b3261e; }
+:root[data-theme="dark"] .status.err { color: #ff9b94; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .status.err { color: #ff9b94; } }
+
+.banner { background: var(--accent-soft); border-radius: 4px; padding: 10px 14px; font-size: 0.95rem; }
+.note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 4px; padding: 12px 14px; font-size: 0.95rem; }
+.note ul { margin: 6px 0 0; padding-left: 20px; }
+
+.top { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 22px; align-items: start; }
+@media (max-width: 760px) { .top { grid-template-columns: minmax(0, 1fr); } }
+.thumb-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.thumb-box img { width: 100%; max-width: 270px; aspect-ratio: 1/1; object-fit: contain; image-rendering: pixelated; background: var(--bg); border: 1px solid var(--rule); align-self: center; }
+.thumb-empty { aspect-ratio: 1/1; max-width: 270px; align-self: center; width: 100%; display: grid; place-items: center; text-align: center; color: var(--muted); border: 1px dashed var(--rule); padding: 12px; font-size: 0.92rem; }
+.cap { color: var(--muted); font-size: 0.85rem; }
+
+section.card { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
+.head .sub { color: var(--muted); font-size: 0.9rem; flex: 1 1 260px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+
+.tw { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; max-height: 420px; overflow-y: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th { position: sticky; top: 0; background: var(--surface); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; box-shadow: 0 1px 0 var(--rule); }
+td.r, th.r { text-align: right; }
+td.k { color: var(--muted); white-space: nowrap; }
+td { overflow-wrap: anywhere; }
+td.nw { white-space: nowrap; overflow-wrap: normal; }
+td.wrapany { word-break: break-all; }
+tr:last-child td { border-bottom: 0; }
+.bar { display: inline-block; height: 8px; background: var(--bar); border-radius: 2px; vertical-align: middle; min-width: 2px; }
+.search { font: inherit; padding: 7px 10px; border: 1px solid var(--rule); border-radius: 4px; background: var(--bg); color: var(--fg); width: 100%; max-width: 360px; }
+.tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.tag { display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+.csvbox { width: 100%; height: 120px; font-family: var(--font-data); font-size: 0.8rem; background: var(--bg); color: var(--fg); border: 1px solid var(--rule); border-radius: 4px; }
+.vwrap { background: #0d1419; border-radius: 4px; overflow: hidden; }
+#vcanvas { display: block; width: 100%; height: min(62vh, 560px); min-height: 320px; cursor: grab; }
+#vcanvas:active { cursor: grabbing; }
+.selbox { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; }
+.sl { display: flex; align-items: center; gap: 8px; flex: 1 1 230px; font-size: 0.88rem; }
+.sl input[type=range] { flex: 1; min-width: 80px; }
+.sl .v { min-width: 4.5em; text-align: right; font-family: var(--font-data); font-size: 0.82rem; }
+details summary { cursor: pointer; font-weight: 500; }
+.pc { white-space: nowrap; font-family: var(--font-data); font-size: 0.82rem; }
+.pc .bar { margin-right: 6px; height: 7px; }
+tr.row { cursor: pointer; }
+tr.row:hover td { background: var(--accent-soft); }
+tr.det td { background: var(--bg); }
+.pset { margin: 0 0 10px; }
+.pset b { font-weight: 600; }
+.pset .src { color: var(--muted); font-size: 0.8rem; margin-left: 6px; }
+.kvs { display: grid; grid-template-columns: max-content 1fr; gap: 2px 14px; font-size: 0.88rem; margin-top: 4px; }
+.kvs span:nth-child(odd) { color: var(--muted); }
+.kvs span { overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>BIM File Reader</h1>
+    <p class="lede">Open a Revit file (.rvt) or an IFC file (.ifc) and see what can be read from it without Revit. Revit files give project details, the thumbnail, the internal layout and the names stored in the model. IFC files give the real element list with types, materials, properties and a data-readiness audit. Everything runs in your browser and the file never leaves your computer.</p>
+  </header>
+
+  <div class="drop" id="drop">
+    <div>
+      <strong>Drop an .rvt or .ifc file here</strong>
+      <div class="hint">Tested on Revit 2024 sample files and a Revit 2023 IFC2X3 export. IFC files are read as text, so very large ones (hundreds of MB) can be slow.</div>
+    </div>
+    <div>
+      <label for="file" class="btn" id="pick" role="button" tabindex="0">Choose file</label>
+      <input type="file" id="file" accept=".rvt,.ifc">
+    </div>
+    <div style="flex-basis:100%">
+      <div class="progress" id="progwrap" hidden><div id="prog"></div></div>
+      <div class="status" id="status" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="drop" id="scanbox">
+    <div style="flex:1 1 320px">
+      <strong>Scan inventory</strong>
+      <div class="hint">Choose the folder of classified point files (subfolders S1, S2, and so on, holding files such as chair_1.txt). Each file is measured as one object. The files are read in your browser and never uploaded.</div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+      <label for="mode" class="cap">Detail</label>
+      <select id="mode" class="search" style="width:auto"><option value="20">Quick (every 20th point)</option><option value="1">Exact (every point)</option></select>
+      <label for="dir" class="btn" id="dirpick" role="button" tabindex="0">Choose scan folder</label>
+      <input type="file" id="dir" webkitdirectory multiple>
+    </div>
+    <div style="flex-basis:100%">
+      <div class="progress" id="sprogwrap" hidden><div id="sprog"></div></div>
+      <div class="status" id="sstatus" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div id="out"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako_inflate.min.js"></script>
+<script>
+/*RVTJS*/
+</script>
+<script>
+/*IFCJS*/
+</script>
+<script>
+/*SCANJS*/
+</script>
+<script>
+/*VIEWERJS*/
+</script>
+<script>
+(function () {
+  const SAMPLE = /*SAMPLE*/null;
+  const SAMPLE_IFC = /*SAMPLEIFC*/null;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const fmtBytes = n => n == null ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
+  const fmtN = n => Number(n).toLocaleString('en-US');
+
+  const STREAM_NOTES = {
+    '/BasicFileInfo': 'Version, build, saved-from path, worksharing state',
+    '/ProjectInformation': 'Project details stored as a small XML file',
+    '/RevitPreview4.0': 'The thumbnail image (PNG)',
+    '/TransmissionData': 'References to linked files and libraries',
+    '/Contents': 'Container index',
+    '/Global/Latest': 'Document-wide settings and definitions, compressed',
+    '/Global/History': 'Edit history, compressed',
+    '/Global/ElemTable': 'Index of model elements, compressed',
+    '/Global/PartitionTable': 'List of the data partitions',
+    '/Global/ContentDocuments': 'Document-level content, mostly binary, compressed',
+    '/Global/DocumentIncrementTable': 'Save counters, compressed',
+    '/Formats/Latest': "Revit's data dictionary: names of classes and fields, compressed"
+  };
+  const noteFor = p => STREAM_NOTES[p] || (p.startsWith('/Partitions/') ? 'The model itself: element data and geometry, compressed in blocks' : '');
+
+  function kindOf(s) {
+    if (/^(Level \d{1,2}|Ground [Ff]loor|Lower Ref\.? Level|Upper Ref\.? Level|Roof Level|Basement|Mezzanine)$/.test(s)) return 'level';
+    if (/^(Floor Plans?|Ceiling Plans?|Structural Plans?|3D Views?|Elevations?( \d+)?|Sections?( \d+)?|Detail Views?( \d+)?|Drafting Views?( \d+)?|Legends?|Schedules?|Sheets?)$/.test(s)) return 'view';
+    if (/^M_/.test(s)) return 'library family';
+    if (/^autodesk\.unit\./.test(s)) return 'unit';
+    if (/^autodesk\.spec\./.test(s)) return 'spec';
+    if (/^autodesk\.parameter\.group/.test(s)) return 'parameter group';
+    if (/^[A-Za-z]:\\|\.(rvt|rfa|txt|xml|fbx|png|jpg)$/i.test(s)) return 'file path';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(s)) return 'id';
+    return 'text';
+  }
+
+  function toCsv(head, rows) {
+    const q = v => { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    return [head.map(q).join(',')].concat(rows.map(r => r.map(q).join(','))).join('\n');
+  }
+
+  let csvStore = {};
+  function copyBtn(id, head, rows) {
+    csvStore[id] = toCsv(head, rows);
+    return '<button class="ghost" data-copy="' + id + '" type="button">Copy as CSV</button>';
+  }
+
+  function table(headers, rows, opts) {
+    opts = opts || {};
+    const th = headers.map((h, i) => '<th' + (opts.right && opts.right.includes(i) ? ' class="r"' : '') + '>' + esc(h) + '</th>').join('');
+    const tr = rows.map(r => '<tr>' + r.map((c, i) => {
+      const cls = [];
+      if (opts.right && opts.right.includes(i)) cls.push('r', 'num');
+      if (opts.mono && opts.mono.includes(i)) { cls.push('mono'); if (!(opts.wrap && opts.wrap.includes(i))) cls.push('nw'); }
+      if (opts.wrap && opts.wrap.includes(i)) cls.push('wrapany');
+      return '<td' + (cls.length ? ' class="' + cls.join(' ') + '"' : '') + '>' + c + '</td>';
+    }).join('') + '</tr>').join('');
+    return '<div class="tw"><table><thead><tr>' + th + '</tr></thead><tbody>' + tr + '</tbody></table></div>';
+  }
+
+  function render(vm, banner) {
+    csvStore = {};
+    const info = vm.info || {};
+    const kv = (k, v) => '<tr><td class="k">' + esc(k) + '</td><td class="mono wrapany">' + (v ? esc(v) : '<span class="cap">not stored</span>') + '</td></tr>';
+    const pf = vm.project.fields || [];
+    const pm = vm.project.meta || {};
+    const fileRows = [
+      ['File name', vm.fileName], ['File size', fmtBytes(vm.fileSize)], ['Revit version (format)', info.Format || info.__version],
+      ['Build', info.__build], ['Saved from', info.__path], ['Worksharing', info.Worksharing], ['Central model path', info['Central Model Path']],
+      ['Saved by (username)', info.Username], ['Language when saved', info['Locale when saved']], ['Document GUID', info['Unique Document GUID']],
+      ['Save count (increments)', info['Unique Document Increments']], ['Author tag', info.Author], ['Last updated', pm.updated]
+    ];
+    const projRows = pf.map(f => [f.name, f.value]);
+
+    let html = '';
+    if (banner) html += '<div class="banner">' + banner + '</div>';
+
+    html += '<div class="top">';
+    html += '<div class="thumb-box"><h2>Thumbnail</h2>';
+    if (vm.thumb) html += '<img alt="Thumbnail stored in ' + esc(vm.fileName) + '" src="' + vm.thumb.data + '"><div class="cap">' + vm.thumb.w + ' by ' + vm.thumb.h + ' px, ' + fmtBytes(vm.thumb.bytes) + '. Revit saves this small picture of the active view; it is not the model.</div>';
+    else html += '<div class="thumb-empty">This file has no thumbnail. Revit leaves it out when the file was saved without a preview.</div>';
+    html += '</div>';
+    html += '<div style="display:flex;flex-direction:column;gap:22px;min-width:0">';
+    html += '<section class="card"><div class="head"><h2>Project information</h2>' + (projRows.length ? copyBtn('proj', ['Field', 'Value'], projRows) : '') + '</div>';
+    html += projRows.length ? table(['Field', 'Value'], projRows.map(r => [esc(r[0]), esc(r[1])])) : '<p class="cap">No project details found.</p>';
+    html += '</section>';
+    html += '<section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('facts', ['Field', 'Value'], fileRows) + '</div>';
+    html += '<div class="tw"><table><tbody>' + fileRows.map(r => kv(r[0], r[1])).join('') + '</tbody></table></div></section>';
+    html += '</div></div>';
+
+    // readiness
+    const R = vm.readiness;
+    if (R) {
+      const rrows = R.items.map(i => [esc(i.name), esc(i.why), i.seen ? '<span class="tag">seen</span>' : '<span class="cap">not seen</span>', i.mentions ? fmtN(i.mentions) : '']);
+      html += '<section class="card"><div class="head"><h2>Submittal data readiness</h2><p class="sub">' + R.found + ' of ' + R.total + ' key fields appear in this file\'s text. This shows signals, not a pass or fail.</p>' +
+        copyBtn('ready', ['Field', 'Why it matters', 'Seen in file text', 'Mentions'], R.items.map(i => [i.name, i.why, i.seen ? 'seen' : 'not seen', i.mentions])) + '</div>';
+      html += '<div class="tw"><table><tbody>' + R.tables.map(x => '<tr><td class="k">' + esc(x.name) + '</td><td class="mono wrapany">' + (x.file ? esc(x.file) : '<span class="cap">no table referenced</span>') + '</td><td>' + (x.state ? '<span class="tag">' + esc(x.state) + '</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>';
+      html += table(['Field', 'Why it matters', 'In file text', 'Mentions'], rrows, { right: [3] });
+      html += '<p class="cap">Read this with care. Revit has most of these fields built in, so a field that is not seen is not necessarily missing. And a field that is seen only proves the label exists, not that anyone filled in a value for any element. A loaded classification table means the team could classify elements, not that they did. Checking real values and the percent filled in needs the IFC export.</p></section>';
+    }
+
+    // container
+    const maxInf = Math.max.apply(null, vm.container.map(c => c.inflated || c.bytes || 0).concat([1]));
+    const crow = vm.container.map(c => {
+      const w = Math.max(2, Math.round(100 * (c.inflated || c.bytes) / maxInf));
+      return [esc(c.path), fmtBytes(c.bytes), c.inflated != null ? fmtBytes(c.inflated) : '', c.parts ? fmtN(c.parts) : '', '<span class="bar" style="width:' + w + 'px;max-width:100%"></span>', esc(noteFor(c.path))];
+    });
+    html += '<section class="card"><div class="head"><h2>Inside the file</h2><p class="sub">An .rvt is a container of named streams. Most of the size is the model partition, stored compressed.</p>' +
+      copyBtn('streams', ['Stream', 'Stored bytes', 'Unpacked bytes', 'Blocks', 'What it holds'], vm.container.map(c => [c.path, c.bytes, c.inflated == null ? '' : c.inflated, c.parts || '', noteFor(c.path)])) + '</div>';
+    html += table(['Stream', 'Stored', 'Unpacked', 'Blocks', 'Relative size', 'What it holds'], crow, { right: [1, 2, 3], mono: [0] });
+    html += '</section>';
+
+    // views + levels
+    const a = vm.analysis;
+    html += '<div class="grid2">';
+    html += '<section class="card"><div class="head"><h2>View and sheet kinds</h2>' + copyBtn('views', ['Kind', 'Mentions', 'Examples'], a.viewKinds.map(v => [v.name, v.mentions, v.examples])) + '</div>';
+    html += table(['Kind', 'Mentions', 'Examples'], a.viewKinds.map(v => [esc(v.name), fmtN(v.mentions), esc(v.examples)]), { right: [1] });
+    html += '<p class="cap">Mentions count how often the name appears in the file data, not how many views exist.</p></section>';
+    html += '<section class="card"><div class="head"><h2>Level names</h2>' + copyBtn('levels', ['Name', 'Mentions'], a.levels.map(v => [v.name, v.mentions])) + '</div>';
+    html += a.levels.length ? table(['Name', 'Mentions'], a.levels.map(v => [esc(v.name), fmtN(v.mentions)]), { right: [1] }) : '<p class="cap">No level names matched.</p>';
+    html += '<p class="cap">Matched by common names such as Level 1 and Ground floor. Custom level names will not show here.</p></section>';
+    html += '</div>';
+
+    // library + units
+    html += '<div class="grid2">';
+    html += '<section class="card"><div class="head"><h2>Library families (M_ prefix)</h2>' + copyBtn('fams', ['Name', 'Mentions'], a.families.map(v => [v.name, v.mentions])) + '</div>';
+    html += a.families.length ? table(['Name', 'Mentions'], a.families.map(v => [esc(v.name), fmtN(v.mentions)]), { right: [1] }) : '<p class="cap">None found.</p>';
+    html += '<p class="cap">Metric content from Autodesk\'s standard library is named M_. Imperial and custom families use other names and appear in the text list below.</p></section>';
+    html += '<section class="card"><div class="head"><h2>Units and measurement types</h2>' + copyBtn('units', ['Unit', 'Mentions'], a.units.map(v => [v.name, v.mentions])) + '</div>';
+    html += table(['Unit', 'Mentions'], a.units.map(v => [esc(v.name), fmtN(v.mentions)]), { right: [1] });
+    html += '<p class="cap">Units the file refers to. Both metric and imperial can appear in one file.</p></section>';
+    html += '</div>';
+
+    // parameter groups + specs
+    html += '<div class="grid2">';
+    html += '<section class="card"><div class="head"><h2>Parameter groups</h2>' + copyBtn('groups', ['Group', 'Mentions'], a.groups.map(v => [v.name, v.mentions])) + '</div>';
+    html += a.groups.length ? table(['Group', 'Mentions'], a.groups.map(v => [esc(v.name), fmtN(v.mentions)]), { right: [1] }) : '<p class="cap">None found.</p>';
+    html += '<p class="cap">Headings that Revit uses to organize element properties, such as dimensions, materials and identity data.</p></section>';
+    html += '<section class="card"><div class="head"><h2>Data types</h2>' + copyBtn('specs', ['Type', 'Area', 'Mentions'], a.specs.map(v => [v.name, v.area, v.mentions])) + '</div>';
+    html += a.specs.length ? table(['Type', 'Area', 'Mentions'], a.specs.map(v => [esc(v.name), esc(v.area), fmtN(v.mentions)]), { right: [2] }) : '<p class="cap">None found.</p>';
+    html += '<p class="cap">The kinds of values properties can hold (length, flow, pipe size, and so on).</p></section>';
+    html += '</div>';
+
+    // external
+    if (vm.external && vm.external.length) {
+      html += '<section class="card"><div class="head"><h2>External references</h2><p class="sub">Linked models, images and libraries the file points to.</p>' +
+        copyBtn('ext', ['Type', 'Path', 'Full path', 'State'], vm.external.map(e => [e.type, e.path, e.absolute, e.state])) + '</div>';
+      html += table(['Type', 'Path', 'Full path when saved', 'State'], vm.external.map(e => [esc(e.type), esc(e.path), esc(e.absolute), esc(e.state)]), { mono: [1, 2], wrap: [2] });
+      html += '</section>';
+    }
+
+    // all text
+    html += '<section class="card"><div class="head"><h2>All readable text</h2><p class="sub">' + fmtN(vm.totalStrings) + ' distinct names and labels found' + (vm.strings.length < vm.totalStrings ? ' (the example keeps the most frequent ' + fmtN(vm.strings.length) + ')' : '') + '. This is the raw material for family, type, material and view names.</p></div>';
+    html += '<div class="tools"><label for="q" class="cap">Filter</label><input id="q" class="search" type="search" placeholder="Try door, duct, W250, Level" autocomplete="off">' +
+      '<select id="kind" class="search" style="max-width:190px"><option value="">All kinds</option></select><span class="cap" id="qcount"></span><button class="ghost" type="button" id="qcopy">Copy shown as CSV</button></div>';
+    html += '<div id="qtable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
+
+    html += '<div class="note"><strong>What this does not show.</strong><ul>' +
+      '<li>Counts of walls, doors, ducts or any other element. Revit keeps those in a binary model format that only Revit itself, or Autodesk\'s cloud tools, can read completely.</li>' +
+      '<li>Geometry, sheets as drawn, or parameter values on individual elements.</li>' +
+      '<li>Mentions are string matches, so a name that appears in the file is not proof that the model uses it.</li></ul>' +
+      'To get element-level data, export the model to IFC from Revit or Autodesk\'s tools and load that file into a reader built for it.</div>';
+
+    $('out').innerHTML = html;
+    wire(vm);
+  }
+
+
+  const PCT_KEYS = [['type', 'Has type'], ['material', 'Material'], ['classification', 'Classification'], ['fire', 'Fire rating'], ['maker', 'Maker or model'], ['quantities', 'Quantities'], ['anyPset', 'Any properties']];
+  const pctCell = n => '<span class="pc"><span class="bar" style="width:' + Math.round(n * 0.6) + 'px"></span>' + n + '%</span>';
+
+  let lastIfc = SAMPLE_IFC;
+  function renderIfc(r, banner) {
+    lastIfc = r;
+    csvStore = {};
+    let html = '';
+    if (banner) html += '<div class="banner">' + banner + '</div>';
+    const hdr = r.header || {};
+    const exporter = (/'([^']*Exporter[^']*)'/.exec(hdr.name || '') || [])[1] || '';
+    const facts = [
+      ['File name', r.fileName], ['File size', fmtBytes(r.fileSize)], ['IFC schema', hdr.schema], ['Exported from', r.app],
+      ['Exporter', exporter], ['View definition', (/ViewDefinition \[([^\]]*)\]/.exec(hdr.description || '') || [])[1] || ''],
+      ['Project name', r.project && r.project.name], ['Project long name', r.project && r.project.longName],
+      ['Entities in file', fmtN(r.totals.entities)], ['Products in file (incl. openings)', fmtN(r.totals.elements)]
+    ];
+    const lenU = (r.units.find(u => u.kind === 'length') || {}).unit;
+    if (lenU) facts.push(['Length unit', lenU]);
+    html += '<div class="grid2"><section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('ifacts', ['Field', 'Value'], facts) + '</div>';
+    html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + (f[1] ? esc(f[1]) : '<span class="cap">not stored</span>') + '</td></tr>').join('') + '</tbody></table></div></section>';
+    html += '<section class="card"><div class="head"><h2>Spatial structure</h2>' + copyBtn('ihier', ['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [h.cls, h.name, h.extra, h.count == null ? '' : h.count])) + '</div>';
+    html += table(['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [esc(h.cls), esc(h.name), esc(h.extra), h.count == null ? '' : fmtN(h.count)]), { right: [3] });
+    html += '<p class="cap">Site, building, level, and the elements placed on each level.</p></section></div>';
+
+    html += '<section class="card"><div class="head"><h2>What is in the model</h2>' + copyBtn('icls', ['Class', 'Count', 'Types', 'Levels'], r.classes.map(c => [c.cls, c.count, c.types, c.levels])) + '</div>';
+    html += table(['IFC class', 'Count', 'Distinct types', 'Level'], r.classes.map(c => [esc(c.cls), fmtN(c.count), fmtN(c.types), esc(c.levels)]), { right: [1, 2], mono: [0] });
+    html += '</section>';
+
+    html += '<section class="card"><div class="head"><h2>Data readiness by class</h2><p class="sub">The share of elements in each class that carry each kind of data. These are real counts from the model.</p>' +
+      copyBtn('iready', ['Class', 'Elements'].concat(PCT_KEYS.map(k => k[1])), r.readiness.map(x => [x.cls, x.n].concat(PCT_KEYS.map(k => x.pct[k[0]])))) + '</div>';
+    html += table(['Class', 'Elements'].concat(PCT_KEYS.map(k => k[1])), r.readiness.map(x => [esc(x.cls), fmtN(x.n)].concat(PCT_KEYS.map(k => pctCell(x.pct[k[0]])))), { right: [1], mono: [0] });
+    html += '<p class="cap">Has type means the element is linked to a named type. Material and classification mean a material or classification is attached. Fire rating and maker or model look for a filled-in property with those names. Quantities means area, volume or length values exist. A 0% in maker or model on a model like this means the exporter wrote no manufacturer data, which is common, and it is the number that matters most for submittals.</p></section>';
+
+    html += '<div class="grid2">';
+    html += '<section class="card"><div class="head"><h2>Types</h2>' + copyBtn('itypes', ['Class', 'Type name', 'Instances'], r.types.map(x => [x.cls, x.name, x.count])) + '</div>';
+    html += table(['Class', 'Type name', 'Used'], r.types.map(x => [esc(x.cls.replace(/Type$/, '')), esc(x.name), fmtN(x.count)]), { right: [2], wrap: [1], mono: [0] });
+    html += '</section>';
+    html += '<section class="card"><div class="head"><h2>Materials</h2>' + copyBtn('imats', ['Material', 'Elements'], r.materials.map(x => [x.name, x.elements])) + '</div>';
+    html += r.materials.length ? table(['Material', 'Elements'], r.materials.map(x => [esc(x.name), fmtN(x.elements)]), { right: [1] }) : '<p class="cap">No materials found.</p>';
+    html += '</section></div>';
+
+    html += '<section class="card"><div class="head"><h2>Property sets</h2><p class="sub">Named groups of properties attached to elements.</p>' + copyBtn('ipsets', ['Property set', 'Elements', 'Properties'], r.psets.map(x => [x.name, x.elements, x.props.join('; ')])) + '</div>';
+    html += table(['Property set', 'Elements', 'Properties inside'], r.psets.map(x => [esc(x.name), fmtN(x.elements), esc(x.props.join(', '))]), { right: [1], mono: [0] });
+    html += '</section>';
+
+    html += '<section class="card"><div class="head"><h2>Elements</h2><p class="sub">Click a row to see its properties and materials.</p></div>';
+    html += '<div class="tools"><label for="eq" class="cap">Filter</label><input id="eq" class="search" type="search" placeholder="Try wall, fire, Level" autocomplete="off"><span class="cap" id="ecount"></span>' +
+      '<button class="ghost" type="button" id="ecopy">Copy shown as CSV</button></div><div id="etable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
+
+    html += '<section class="card"><details><summary>Everything in the file, by entity class (' + fmtN(r.census.length) + ' classes)</summary><div style="margin-top:10px">' +
+      table(['Entity class', 'Count'], r.census.map(x => [esc(x.label), fmtN(x.count)]), { right: [1], mono: [0] }) +
+      '<p class="cap" style="margin-top:8px">Most of an IFC is geometry: points, faces and shapes. The building elements above are a small part of it.</p></div></details></section>';
+
+    html += '<div class="note"><strong>What this does not show.</strong><ul>' +
+      '<li>Geometry as a picture. This reader lists what the model contains but does not draw it yet.</li>' +
+      '<li>Elements the exporter left out. An IFC holds only what was exported, so a room can have far more in reality than in its IFC.</li></ul></div>';
+
+    $('out').innerHTML = html;
+    document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
+
+    const els = r.elements;
+    const detail = el => {
+      let h = '<div class="kvs"><span>GlobalId</span><span class="mono">' + esc(el.guid) + '</span><span>Type</span><span>' + esc(el.typeName || 'none') + '</span><span>Object type</span><span>' + esc(el.objType) + '</span><span>Tag</span><span>' + esc(el.tag) + '</span><span>Materials</span><span>' + esc(el.materials.join(', ') || 'none') + '</span></div><div style="margin-top:10px">';
+      if (!el.psets.length) h += '<span class="cap">No property sets.</span>';
+      for (const p of el.psets) {
+        h += '<div class="pset"><b>' + esc(p.name) + '</b><span class="src">' + (p.source === 'type' ? 'from type' : 'on element') + '</span><div class="kvs">' +
+          p.props.map(q => '<span>' + esc(q.name) + '</span><span class="mono">' + esc(q.value == null ? '' : q.value) + (q.kind ? ' (' + esc(q.kind) + ')' : '') + '</span>').join('') + '</div></div>';
+      }
+      return h + '</div>';
+    };
+    let shown = [];
+    function drawEls() {
+      const q = $('eq').value.trim().toLowerCase();
+      shown = els.filter(el => !q || (el.cls + ' ' + el.name + ' ' + el.typeName + ' ' + el.level + ' ' + el.materials.join(' ') + ' ' + el.psets.map(p => p.props.map(x => x.name + ' ' + x.value).join(' ')).join(' ')).toLowerCase().includes(q));
+      const part = shown.slice(0, 300);
+      $('etable').innerHTML = '<div class="tw"><table><thead><tr><th>Class</th><th>Name</th><th>Level</th><th class="r">Properties</th></tr></thead><tbody>' +
+        part.map((el, i) => '<tr class="row"><td class="mono">' + esc(el.cls) + '</td><td class="wrapany">' + esc(el.name) + '</td><td>' + esc(el.level) + '</td><td class="r num">' + el.psets.reduce((a, p) => a + p.props.length, 0) + '</td></tr><tr class="det" hidden><td colspan="4">' + detail(el) + '</td></tr>').join('') + '</tbody></table></div>';
+      $('ecount').textContent = shown.length > 300 ? 'Showing first 300 of ' + fmtN(shown.length) : fmtN(shown.length) + ' shown';
+    }
+    $('eq').addEventListener('input', drawEls);
+    $('ecopy').addEventListener('click', e => copyText(toCsv(['Class', 'Name', 'Type', 'Level', 'GlobalId', 'Materials', 'FireRating'], shown.map(el => {
+      const fr = []; el.psets.forEach(p => p.props.forEach(x => { if (/fire\s*rating/i.test(x.name) && x.value) fr.push(x.value); }));
+      return [el.cls, el.name, el.typeName, el.level, el.guid, el.materials.join('; '), fr.join('; ')];
+    })), e.currentTarget));
+    drawEls();
+  }
+
+
+
+  const CLASS_COLORS = { wall: '#8aa4c8', floor: '#c9a66b', ceiling: '#b8c4cc', chair: '#f08a3c', table: '#9a6a35', desk: '#b07a40', door: '#3fae6b', window: '#5ec2e0', light: '#ffe66d', projector: '#e0507a', railing: '#a77be0', stair: '#d9b27c', platform: '#8fa860', board: '#ececec', sign: '#1fd1a8', exit: '#00e08a', computer: '#5b8be8', curtain: '#cf78bd', utilities: '#b5b5b5', unknown: '#7c858c' };
+  function classColor(c) {
+    const h = CLASS_COLORS[c];
+    if (h) return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    let n = 0; for (const ch of c) n = (n * 31 + ch.charCodeAt(0)) % 360;
+    const a = n / 60, x = 1 - Math.abs(a % 2 - 1); const [r, g, b] = [[1, x, 0], [x, 1, 0], [0, 1, x], [0, x, 1], [x, 0, 1], [1, 0, x]][Math.floor(a) % 6];
+    return [r, g, b].map(v => Math.round(120 + v * 110));
+  }
+  let viewer = null;
+  function startViewer(res) {
+    viewer = null;
+    const objs = res.objs;
+    const byCls = new Map();
+    for (const o of objs) { if (!o.pts || !o.pts.n) continue; let g = byCls.get(o.cls); if (!g) byCls.set(o.cls, g = { cls: o.cls, parts: [], n: 0 }); g.parts.push({ p: o.pts, o }); g.n += o.pts.n; }
+    const order = res.summary.classes.map(c => c.cls);
+    const groups = [];
+    for (const cls of order) {
+      const g = byCls.get(cls); if (!g) continue;
+      const xyz = new Float32Array(g.n * 3), rgb = new Uint8Array(g.n * 3);
+      let off = 0; const ranges = [];
+      for (const { p, o } of g.parts) { xyz.set(p.xyz, off * 3); rgb.set(p.rgb, off * 3); ranges.push({ start: off, count: p.n, obj: o, box: { min: o.p1, max: o.p99 } }); off += p.n; }
+      groups.push({ cls, n: g.n, xyz, rgb, color: classColor(cls), ranges });
+    }
+    for (const o of objs) o.pts = null;
+    $('vsel').innerHTML = SEL_HINT;
+    const total = groups.reduce((a, g) => a + g.n, 0);
+    const info = $('vinfo');
+    if (!groups.length) { info.textContent = 'No points to show.'; return; }
+    try {
+      const sh = res.summary.room.shell;
+      viewer = new Viewer3D($('vcanvas'), groups, Object.assign({ onPick: showSel }, sh ? { bounds: sh } : {}));
+    } catch (e) { info.textContent = 'Could not start the 3D view. ' + (e.message || e); return; }
+    viewer.setMode(+$('vmode').value);
+    info.textContent = fmtN(total) + ' points shown';
+    $('vclasses').innerHTML = groups.map(g => '<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.88rem"><input type="checkbox" data-vc="' + esc(g.cls) + '" checked>' +
+      '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:rgb(' + g.color.join(',') + ')"></span>' + esc(g.cls) + ' <span class="cap">' + fmtN(g.n) + '</span></label>').join('');
+    document.querySelectorAll('[data-vc]').forEach(cb => cb.addEventListener('change', () => viewer.setVisible(cb.dataset.vc, cb.checked)));
+    $('vmode').addEventListener('change', e => viewer.setMode(+e.target.value));
+    $('vsize').addEventListener('input', e => viewer.setSize(+e.target.value));
+    $('vreset').addEventListener('click', () => viewer.reset());
+    const all = v => { document.querySelectorAll('[data-vc]').forEach(cb => { cb.checked = v; viewer.setVisible(cb.dataset.vc, v); }); };
+    $('vall').addEventListener('click', () => all(true)); $('vnone').addEventListener('click', () => all(false));
+    setupOverlay(res, groups);
+  }
+
+  const SEL_HINT = '<span class="cap">Click a point in the 3D view to see which scan object it belongs to and its measurements.</span>';
+  function showSel(p) {
+    const box = $('vsel');
+    if (!p) { box.innerHTML = SEL_HINT; return; }
+    const o = p.range.obj;
+    box.innerHTML = '<div class="head" style="margin-bottom:6px"><h3 style="margin:0;font-size:1rem">' + swatch(o.rgb) + esc(o.name) + ' <span class="tag">' + esc(o.slice) + '</span></h3><button class="ghost" type="button" id="vclear">Clear selection</button></div>' +
+      '<div class="kvs"><span>Class</span><span>' + esc(o.cls) + '</span><span>Points</span><span>' + fmtN(o.points) + '</span>' +
+      '<span>Size X × Y × Z</span><span class="mono">' + size3(o.size) + ' m (' + feet3(o.size) + ' ft)</span>' +
+      '<span>Height range</span><span class="mono">' + m2(o.p1[2]) + ' to ' + m2(o.p99[2]) + ' m</span>' +
+      '<span>Center</span><span class="mono">' + o.mean.map(m2).join(', ') + '</span>' +
+      '<span>Average color</span><span>' + swatch(o.rgb) + o.rgb.map(Math.round).join(', ') + '</span>' +
+      '<span>File</span><span class="mono wrapany">' + esc(o.path) + '</span></div>' +
+      '<p class="cap" style="margin:6px 0 0">The white points mark the object and the yellow box is the trimmed size, ignoring the outer 1% of stray points.</p>';
+    $('vclear').addEventListener('click', () => { viewer.select(-1); showSel(null); });
+  }
+
+  const IFC_LINE = { wall: '#4cc9f0', slab: '#f4a261', door: '#80ed99', window: '#7dd3fc', column: '#ff6b6b', ramp: '#d0a2f7', railing: '#c77dff', buildingelementproxy: '#e9ecef', stair: '#ffd166', beam: '#ff9f1c', roof: '#e07a5f', furnishingelement: '#f6bd60' };
+  function ifcLineColor(cls) {
+    const k = cls.replace(/^Ifc/i, '').toLowerCase().replace(/standardcase$/, '');
+    if (IFC_LINE[k]) return hexRgb(IFC_LINE[k]);
+    return hexRgb('#ffd166');
+  }
+  const hexRgb = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+
+  function setupOverlay(res, groups) {
+    const box = $('ovbox'); if (!box) return;
+    const g = lastIfc && lastIfc.geom;
+    if (!g || !g.length) {
+      box.innerHTML = '<span class="cap">The IFC loaded above has no drawable shapes, so there is nothing to overlay. Load an IFC first, then choose the scan folder again.</span>';
+      return;
+    }
+    const byCls = new Map();
+    for (const e of g) { let a = byCls.get(e.cls); if (!a) byCls.set(e.cls, a = []); a.push(e); }
+    const items = [];
+    for (const [cls, list] of byCls) {
+      const n = list.reduce((a, e) => a + e.edges.length, 0), pos = new Float32Array(n); let o = 0;
+      for (const e of list) { pos.set(e.edges, o); o += e.edges.length; }
+      items.push({ cls, pos, color: ifcLineColor(cls), count: list.length });
+    }
+    const ext = viewer.setOverlay(items);
+    if (!ext) { box.innerHTML = ''; return; }
+    const sh = res.summary.room.shell;
+    const base = { cx: viewer.info.center[0], cy: viewer.info.center[1], cz: viewer.info.center[2] };
+    const off = { x: 0, y: 0, z: 0 }; let rotDeg = 0;
+    const apply = () => viewer.setOverlayPose({ cx: base.cx + off.x, cy: base.cy + off.y, cz: base.cz + off.z, rot: rotDeg * Math.PI / 180 });
+
+    // IFC wall outline samples at the base of each wall, relative to the IFC center
+    const wallSamples = [];
+    const wallsOnly = g.filter(e => /wall/i.test(e.cls));
+    for (const e of (wallsOnly.length ? wallsOnly : g)) {
+      const a = e.edges; let minz = Infinity;
+      for (let i = 2; i < a.length; i += 3) if (a[i] < minz) minz = a[i];
+      for (let i = 0; i + 5 < a.length; i += 6) {
+        if (Math.abs(a[i + 2] - minz) > 0.02 || Math.abs(a[i + 5] - minz) > 0.02) continue;
+        const dx = a[i + 3] - a[i], dy = a[i + 4] - a[i + 1], L = Math.hypot(dx, dy); if (L < 0.02) continue;
+        const k = Math.max(1, Math.round(L / 0.15));
+        for (let j = 0; j <= k; j++) wallSamples.push(a[i] + dx * j / k - ext.center[0], a[i + 1] + dy * j / k - ext.center[1]);
+      }
+    }
+    const wallZs = wallsOnly.map(e => { let m = Infinity; for (let i = 2; i < e.edges.length; i += 3) if (e.edges[i] < m) m = e.edges[i]; return m; }).sort((x, y) => x - y);
+    const ifcFloorZ = wallZs.length ? wallZs[wallZs.length >> 1] : ext.lo[2];
+    const scanFloorZ = res.summary.room.floorZ != null ? res.summary.room.floorZ : (sh ? sh.min[2] : viewer.info.lo[2]);
+
+    function autoAlign() {
+      // scan wall points on a coarse grid
+      const src = groups.find(x => x.cls === 'wall') || groups[0];
+      const CELL = 0.15, pad = 4, x0 = viewer.info.lo[0] - pad, y0 = viewer.info.lo[1] - pad;
+      const W = Math.ceil((viewer.info.hi[0] - viewer.info.lo[0] + 2 * pad) / CELL) + 2, H = Math.ceil((viewer.info.hi[1] - viewer.info.lo[1] + 2 * pad) / CELL) + 2;
+      const grid = new Uint8Array(W * H);
+      for (let i = 0; i < src.n; i++) {
+        const cx = Math.floor((src.xyz[i * 3] - x0) / CELL), cy = Math.floor((src.xyz[i * 3 + 1] - y0) / CELL);
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const x = cx + dx, y = cy + dy; if (x >= 0 && y >= 0 && x < W && y < H) grid[y * W + x] = 1; }
+      }
+      const cs = sh ? [(sh.min[0] + sh.max[0]) / 2, (sh.min[1] + sh.max[1]) / 2] : [viewer.info.center[0], viewer.info.center[1]];
+      const ns = wallSamples.length / 2; let best = { s: -1 };
+      for (const r of [0, 90, 180, 270]) {
+        const cr = Math.cos(r * Math.PI / 180), sr = Math.sin(r * Math.PI / 180);
+        const rx = new Float32Array(ns), ry = new Float32Array(ns);
+        for (let i = 0; i < ns; i++) { const x = wallSamples[i * 2], y = wallSamples[i * 2 + 1]; rx[i] = cr * x - sr * y; ry[i] = sr * x + cr * y; }
+        for (let sx = -2; sx <= 2.0001; sx += 0.1) for (let sy = -2; sy <= 2.0001; sy += 0.1) {
+          const tx = cs[0] + sx, ty = cs[1] + sy; let hit = 0;
+          for (let i = 0; i < ns; i++) {
+            const cx = Math.floor((tx + rx[i] - x0) / CELL), cy = Math.floor((ty + ry[i] - y0) / CELL);
+            if (cx >= 0 && cy >= 0 && cx < W && cy < H && grid[cy * W + cx]) hit++;
+          }
+          if (hit > best.s) best = { s: hit, r, tx, ty };
+        }
+      }
+      return { r: best.r, tx: best.tx, ty: best.ty, frac: ns ? best.s / ns : 0 };
+    }
+
+    const rows = [['ovx', 'Move X', 'x', -6, 6, 0.05], ['ovy', 'Move Y', 'y', -6, 6, 0.05], ['ovz', 'Move up', 'z', -4, 4, 0.02], ['ovr', 'Rotate', 'r', -180, 180, 0.5]];
+    box.innerHTML = '<div class="tools"><label style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ovon"> Show IFC outline</label>' +
+      '<button class="ghost" type="button" id="ovauto">Auto-align</button><button class="ghost" type="button" id="ovrot">Rotate 90°</button><button class="ghost" type="button" id="ovreset">Reset</button></div>' +
+      '<div id="ovpanel" hidden><div class="tools" style="gap:6px 14px;margin-top:8px">' + Array.from(byCls.keys()).map(c => '<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.88rem"><input type="checkbox" data-oc="' + esc(c) + '" checked><span style="display:inline-block;width:12px;height:3px;background:rgb(' + ifcLineColor(c).join(',') + ')"></span>' + esc(c.replace(/^Ifc/, '')) + ' <span class="cap">' + byCls.get(c).length + '</span></label>').join('') + '</div>' +
+      '<div class="tools" style="margin-top:8px">' + rows.map(r => '<div class="sl"><label for="' + r[0] + '" style="min-width:4.8em">' + r[1] + '</label><input id="' + r[0] + '" type="range" min="' + r[3] + '" max="' + r[4] + '" step="' + r[5] + '" value="0"><span class="v" id="' + r[0] + 'v">0</span></div>').join('') + '</div>' +
+      '<p class="cap" id="ovstatus" style="margin:6px 0 0"></p></div>';
+    const status = $('ovstatus');
+    const setUi = () => { $('ovx').value = off.x; $('ovy').value = off.y; $('ovz').value = off.z; $('ovr').value = rotDeg; syncV(); };
+    const syncV = () => { $('ovxv').textContent = off.x.toFixed(2) + ' m'; $('ovyv').textContent = off.y.toFixed(2) + ' m'; $('ovzv').textContent = off.z.toFixed(2) + ' m'; $('ovrv').textContent = rotDeg.toFixed(1) + '°'; };
+    function runAuto() {
+      status.textContent = 'Aligning...';
+      setTimeout(() => {
+        const a = autoAlign();
+        rotDeg = a.r > 180 ? a.r - 360 : a.r;
+        base.cx = a.tx; base.cy = a.ty; base.cz = scanFloorZ + (ext.center[2] - ifcFloorZ);
+        off.x = off.y = off.z = 0; setUi(); apply();
+        const pct = Math.round(a.frac * 100);
+        status.textContent = 'Auto-align put ' + pct + '% of the IFC wall outline on scanned wall points. ' + (pct >= 35 ? 'That looks like a reasonable fit, but check it by eye and nudge with the sliders.' : 'That is a weak fit, so the two probably do not share an origin or the scan walls are sparse. Use the sliders to line them up by eye.');
+      }, 30);
+    }
+    $('ovon').addEventListener('change', e => { viewer.setOverlayOn(e.target.checked); $('ovpanel').hidden = !e.target.checked; if (e.target.checked && !box.dataset.aligned) { box.dataset.aligned = '1'; runAuto(); } });
+    $('ovauto').addEventListener('click', () => { if (!$('ovon').checked) { $('ovon').checked = true; viewer.setOverlayOn(true); $('ovpanel').hidden = false; } box.dataset.aligned = '1'; runAuto(); });
+    $('ovrot').addEventListener('click', () => { rotDeg = ((rotDeg + 90 + 180) % 360) - 180; setUi(); apply(); });
+    $('ovreset').addEventListener('click', () => { off.x = off.y = off.z = 0; rotDeg = 0; base.cx = viewer.info.center[0]; base.cy = viewer.info.center[1]; base.cz = viewer.info.center[2]; setUi(); apply(); status.textContent = 'Reset. The IFC is centered on the scan with no rotation.'; });
+    [['ovx', 'x'], ['ovy', 'y'], ['ovz', 'z']].forEach(([id, k]) => $(id).addEventListener('input', e => { off[k] = +e.target.value; syncV(); apply(); }));
+    $('ovr').addEventListener('input', e => { rotDeg = +e.target.value; syncV(); apply(); });
+    box.querySelectorAll('[data-oc]').forEach(cb => cb.addEventListener('change', () => viewer.setOverlayVisible(cb.dataset.oc, cb.checked)));
+    syncV(); apply();
+  }
+
+  const FT = 3.28084;
+  const m2 = v => (Math.round(v * 100) / 100).toFixed(2);
+  const lenBoth = v => m2(v) + ' m (' + (v * FT).toFixed(1) + ' ft)';
+  const size3 = s => s.map(m2).join(' × ');
+  const feet3 = s => s.map(v => (v * FT).toFixed(1)).join(' × ');
+  const swatch = rgb => '<span style="display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:middle;margin-right:6px;border:1px solid var(--rule);background:rgb(' + rgb.map(v => Math.max(0, Math.min(255, Math.round(v)))).join(',') + ')"></span>';
+
+  const IFC_MAP = {
+    wall: el => /^IfcWall/.test(el.cls) && !/curtain/i.test(el.typeName + ' ' + el.name),
+    curtain: el => /curtain/i.test(el.typeName + ' ' + el.name),
+    door: el => el.cls === 'IfcDoor', window: el => el.cls === 'IfcWindow',
+    floor: el => el.cls === 'IfcSlab', ceiling: el => /ceiling/i.test(el.typeName + ' ' + el.name),
+    railing: el => el.cls === 'IfcRailing', stair: el => /^IfcStair|^IfcRamp/.test(el.cls),
+    light: el => /Light/.test(el.cls) || /light|luminaire/i.test(el.name + ' ' + el.typeName)
+  };
+
+  function compareRows(summary, ifc) {
+    const els = (ifc && ifc.elements || []).filter(e => e.clsRaw !== 'IFCOPENINGELEMENT');
+    const used = new Set();
+    const rows = summary.classes.map(c => {
+      const f = IFC_MAP[c.cls];
+      const hit = f ? els.filter(e => f(e)) : [];
+      hit.forEach(e => used.add(e.id));
+      return { cls: c.cls, seg: c.segments, pts: c.points, ifc: hit.length, status: hit.length ? 'In both' : 'Only in scan' };
+    });
+    const rest = new Map();
+    for (const e of els) if (!used.has(e.id)) { const k = e.cls; const r = rest.get(k) || { n: 0, ex: e.name }; r.n++; rest.set(k, r); }
+    const only = Array.from(rest.entries()).map(([k, v]) => ({ cls: k + ' (e.g. ' + v.ex.split(':').slice(0, 2).join(':').slice(0, 40) + ')', seg: 0, pts: 0, ifc: v.n, status: 'Only in model' }));
+    return rows.concat(only);
+  }
+
+  function renderScan(res) {
+    csvStore = {};
+    const S = res.summary, objs = res.objs;
+    const totalPts = objs.reduce((a, o) => a + o.points, 0);
+    let html = '';
+    const facts = [
+      ['Objects measured', fmtN(objs.length)], ['Points counted', fmtN(totalPts)], ['Data read', fmtBytes(res.totalBytes)],
+      ['Detail', res.step > 1 ? 'Quick, every ' + res.step + 'th point measured (all points counted)' : 'Exact, every point measured'],
+      ['Time taken', res.seconds.toFixed(1) + ' s'], ['Other files skipped', fmtN(res.skipped) + (res.skippedBig.length ? ' (including ' + res.skippedBig.length + ' file over 100 MB)' : '')]
+    ];
+    html += '<section class="card"><div class="head"><h2>3D view</h2><p class="sub">Drag to rotate, scroll to zoom, right-drag or shift-drag to move, click a point to select its object. Shows a sample of the points.</p></div>' +
+      '<div class="tools"><label for="vmode" class="cap">Color</label><select id="vmode" class="search" style="width:auto"><option value="1">By class</option><option value="0">True color</option><option value="2">By height</option></select>' +
+      '<label for="vsize" class="cap">Point size</label><input id="vsize" type="range" min="1" max="6" step="0.5" value="2" style="width:120px">' +
+      '<button class="ghost" type="button" id="vreset">Reset view</button><button class="ghost" type="button" id="vall">All on</button><button class="ghost" type="button" id="vnone">All off</button><span class="cap" id="vinfo"></span></div>' +
+      '<div id="vclasses" class="tools" style="gap:6px 14px"></div>' +
+      '<div id="ovbox" style="margin:8px 0"></div>' +
+      '<div class="vwrap"><canvas id="vcanvas" aria-label="3D point cloud of the scanned room"></canvas></div>' +
+      '<div id="vsel" class="selbox" aria-live="polite"></div></section>';
+    html += '<div class="grid2"><section class="card"><div class="head"><h2>Scan summary</h2>' + copyBtn('sfacts', ['Field', 'Value'], facts) + '</div>';
+    html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + esc(f[1]) + '</td></tr>').join('') + '</tbody></table></div>';
+    html += '<p class="cap">Distances are read as meters, which gives believable sizes for chairs and tables.</p></section>';
+
+    const R = S.room, sh = R.shell;
+    const roomRows = [];
+    if (sh) {
+      roomRows.push(['Length along X', lenBoth(sh.max[0] - sh.min[0])]);
+      roomRows.push(['Width along Y', lenBoth(sh.max[1] - sh.min[1])]);
+    }
+    const floors = objs.filter(o => o.cls === 'floor');
+    const lowFloor = floors.length ? Math.min.apply(null, floors.map(o => o.p1[2])) : null;
+    if (lowFloor != null) roomRows.push(['Lowest floor level (Z)', m2(lowFloor) + ' m']);
+    if (R.floorZ != null) roomRows.push(['Average floor level (Z)', m2(R.floorZ) + ' m']);
+    if (R.ceilZ != null) roomRows.push(['Average ceiling level (Z)', m2(R.ceilZ) + ' m']);
+    if (lowFloor != null && R.ceilZ != null) roomRows.push(['Ceiling height above the lowest floor', lenBoth(R.ceilZ - lowFloor)]);
+    html += '<section class="card"><div class="head"><h2>Room measured from the scan</h2>' + copyBtn('sroom', ['Measure', 'Value'], roomRows) + '</div>';
+    html += roomRows.length ? '<div class="tw"><table><tbody>' + roomRows.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono">' + esc(f[1]) + '</td></tr>').join('') + '</tbody></table></div>' : '<p class="cap">Needs floor, ceiling and wall files to measure the room.</p>';
+    html += '<p class="cap">Taken from the floor, ceiling and wall segments. If the floor has steps or a platform, the lowest level and the average differ.</p></section></div>';
+
+    // slices
+    const fe = e => e ? m2(e[0]) + ' to ' + m2(e[1]) : '';
+    html += '<section class="card"><div class="head"><h2>Slices</h2><p class="sub">The scan folders. Their X ranges show how the room was divided.</p>' +
+      copyBtn('sslices', ['Slice', 'Objects', 'Points', 'X range (m)', 'Y range (m)', 'Classes'], S.slices.map(s => [s.slice, s.objects, s.points, s.ext ? m2(s.ext.min[0]) + ' to ' + m2(s.ext.max[0]) : '', s.ext ? m2(s.ext.min[1]) + ' to ' + m2(s.ext.max[1]) : '', s.classes])) + '</div>';
+    html += table(['Slice', 'Objects', 'Points', 'X range (m)', 'Y range (m)', 'Classes'], S.slices.map(s => [esc(s.slice), fmtN(s.objects), fmtN(s.points), s.ext ? m2(s.ext.min[0]) + ' to ' + m2(s.ext.max[0]) : '', s.ext ? m2(s.ext.min[1]) + ' to ' + m2(s.ext.max[1]) : '', fmtN(s.classes)]), { right: [1, 2, 5] });
+    html += '</section>';
+
+    // classes
+    const sliceNames = S.slices.map(s => s.slice);
+    html += '<section class="card"><div class="head"><h2>Object classes</h2><p class="sub">One row per class in the folder names. Size is the typical segment, trimmed at 1% and 99% to ignore stray points.</p>' +
+      copyBtn('scls', ['Class', 'Segments'].concat(sliceNames, ['Points', 'Typical size X by Y by Z (m)', 'Typical size (ft)']), S.classes.map(c => [c.cls, c.segments].concat(sliceNames.map(s => c.slices[s] || 0), [c.points, size3(c.medSize), feet3(c.medSize)]))) + '</div>';
+    html += table(['Class', 'Segments'].concat(sliceNames, ['Points', 'Typical size, m', 'In feet']), S.classes.map(c => [swatch(c.rgb) + esc(c.cls), fmtN(c.segments)].concat(sliceNames.map(s => fmtN(c.slices[s] || 0)), [fmtN(c.points), size3(c.medSize), feet3(c.medSize)])), { right: [1].concat(sliceNames.map((s, i) => 2 + i), [2 + sliceNames.length]), mono: [2 + sliceNames.length + 1, 2 + sliceNames.length + 2] });
+    html += '</section>';
+
+    // compare
+    const cmp = compareRows(S, lastIfc);
+    html += '<section class="card"><div class="head"><h2>Model versus scan</h2><p class="sub">Compared with ' + esc(lastIfc && lastIfc.fileName || 'the IFC') + ', the IFC currently loaded in this page.</p>' +
+      copyBtn('scmp', ['Item', 'Scan segments', 'Scan points', 'IFC elements', 'Reading'], cmp.map(r => [r.cls, r.seg, r.pts, r.ifc, r.status])) + '</div>';
+    html += table(['Item', 'Scan segments', 'Scan points', 'IFC elements', 'Reading'], cmp.map(r => [esc(r.cls), r.seg ? fmtN(r.seg) : '', r.pts ? fmtN(r.pts) : '', r.ifc ? fmtN(r.ifc) : '', '<span class="tag">' + esc(r.status) + '</span>']), { right: [1, 2, 3] });
+    html += '<p class="cap">Segments are not the same as objects. One real chair can be split into several segments, and the model counts whole elements. Read this table as where each side has coverage, not as an exact tally.</p></section>';
+
+    // QA
+    const Q = res.qa, sevTag = v => '<span class="tag" style="' + (v === 'high' ? 'background:#fde2e0;color:#9b1c13' : v === 'med' ? 'background:#fdecc8;color:#7a4b00' : '') + '">' + (v === 'high' ? 'Likely wrong' : v === 'med' ? 'Check' : 'Minor') + '</span>';
+    html += '<section class="card"><div class="head"><h2>Label sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor (floor taken as ' + m2(Q.floor) + ' m). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
+      copyBtn('sqa', ['Severity', 'Object', 'Slice', 'Class', 'Problem'], Q.flagged.map(o => [Q.flags.get(o)[0].sev, o.name, o.slice, o.cls, Q.flags.get(o).map(x => x.msg).join(' ')])) + '</div>';
+    if (!Q.flagged.length) html += '<p>Nothing looks out of place for the rules checked.</p>';
+    else {
+      html += table(['Rule', 'Level', 'Segments'], Q.rules.map(r => [esc(r.rule), sevTag(r.sev), fmtN(r.n)]), { right: [2] });
+      html += '<div id="qaflags" style="margin-top:12px"></div>';
+    }
+    html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables rest on it and are table height or lower, doors are door-sized, lights sit near the ceiling, floors are flat, and any segment far larger or smaller than others in its class.</p></section>';
+
+    // objects
+    html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements.</p></div>';
+    html += '<div class="tools"><label for="oq" class="cap">Filter</label><input id="oq" class="search" type="search" placeholder="Try chair, S2, light" autocomplete="off"><label class="cap" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="oflag"> Flagged only</label><span class="cap" id="ocount"></span><button class="ghost" type="button" id="ocopy">Copy shown as CSV</button></div>';
+    html += '<div id="otable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
+
+    html += '<div class="note"><strong>What this does not show.</strong><ul>' +
+      '<li>True object counts. Each file is one segment, and the class labels come from whoever classified the scan. Some labels look rough: a few wall files are only about 10 cm tall near the ceiling, and a file labeled window is chair-sized.</li>' +
+      '<li>Every point. The 3D view shows a thinned sample so that large scans stay smooth.</li></ul></div>';
+
+    $('out').innerHTML = html;
+    document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
+    startViewer(res);
+    const showObj = o => {
+      if (!viewer) return;
+      const gi = viewer.groups.findIndex(b => b.cls === o.cls); if (gi < 0) return;
+      const ri = viewer.groups[gi].ranges.findIndex(r => r.obj === o); if (ri < 0) return;
+      const cb = document.querySelector('[data-vc="' + o.cls + '"]'); if (cb && !cb.checked) { cb.checked = true; viewer.setVisible(o.cls, true); }
+      viewer.select(gi, ri); showSel({ range: viewer.groups[gi].ranges[ri] });
+      $('vcanvas').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+    if ($('qaflags')) {
+      $('qaflags').innerHTML = '<div class="tw"><table><thead><tr><th>Level</th><th>Object</th><th>What looks off</th><th></th></tr></thead><tbody>' +
+        res.qa.flagged.slice(0, 200).map((o, i) => '<tr><td>' + sevTag(res.qa.flags.get(o)[0].sev) + '</td><td class="mono nw">' + esc(o.slice + '/' + o.name) + '</td><td>' + res.qa.flags.get(o).map(x => esc(x.msg)).join('<br>') + '</td><td><button class="ghost" type="button" data-show="' + i + '">Show in 3D</button></td></tr>').join('') + '</tbody></table></div>';
+      $('qaflags').querySelectorAll('[data-show]').forEach(b => b.addEventListener('click', () => showObj(res.qa.flagged[+b.dataset.show])));
+    }
+
+    const det = o => '<div class="kvs"><span>File</span><span class="mono">' + esc(o.path) + '</span><span>File size</span><span>' + fmtBytes(o.bytes) + '</span><span>Points</span><span>' + fmtN(o.points) + ' (' + fmtN(o.sampled) + ' measured)</span>' +
+      '<span>Bounding box min</span><span class="mono">' + o.min.map(m2).join(', ') + '</span><span>Bounding box max</span><span class="mono">' + o.max.map(m2).join(', ') + '</span>' +
+      '<span>Trimmed size (m)</span><span class="mono">' + size3(o.size) + '</span><span>Trimmed size (ft)</span><span class="mono">' + feet3(o.size) + '</span>' +
+      '<span>Center</span><span class="mono">' + o.mean.map(m2).join(', ') + '</span><span>Average color</span><span>' + swatch(o.rgb) + o.rgb.map(Math.round).join(', ') + '</span><span>Average intensity</span><span class="mono">' + Math.round(o.inten) + '</span>' + (res.qa.flags.has(o) ? '<span>QA</span><span>' + res.qa.flags.get(o).map(x => esc(x.msg)).join('<br>') + '</span>' : '') + '</div>';
+    let shown = [];
+    function drawObjs() {
+      const q = $('oq').value.trim().toLowerCase();
+      const fo = $('oflag').checked;
+      shown = objs.filter(o => (!q || (o.name + ' ' + o.slice).toLowerCase().includes(q)) && (!fo || res.qa.flags.has(o)));
+      const part = shown.slice(0, 400);
+      $('otable').innerHTML = '<div class="tw"><table><thead><tr><th>Object</th><th>Slice</th><th class="r">Points</th><th>Size X × Y × Z (m)</th><th>Floor to top Z (m)</th><th>QA</th></tr></thead><tbody>' +
+        part.map(o => '<tr class="row"><td class="mono nw">' + swatch(o.rgb) + esc(o.name) + '</td><td>' + esc(o.slice) + '</td><td class="r num">' + fmtN(o.points) + '</td><td class="mono nw">' + size3(o.size) + '</td><td class="mono nw">' + m2(o.p1[2]) + ' to ' + m2(o.p99[2]) + '</td><td>' + (res.qa.flags.has(o) ? sevTag(res.qa.flags.get(o)[0].sev) : '') + '</td></tr><tr class="det" hidden><td colspan="6">' + det(o) + '</td></tr>').join('') + '</tbody></table></div>';
+      $('ocount').textContent = shown.length > 400 ? 'Showing first 400 of ' + fmtN(shown.length) : fmtN(shown.length) + ' shown';
+    }
+    $('oq').addEventListener('input', drawObjs); $('oflag').addEventListener('change', drawObjs);
+    $('ocopy').addEventListener('click', e => copyText(toCsv(['Object', 'Class', 'Slice', 'Points', 'Size X m', 'Size Y m', 'Size Z m', 'Z low m', 'Z high m', 'Center X', 'Center Y', 'Center Z', 'R', 'G', 'B'], shown.map(o => [o.name, o.cls, o.slice, o.points, m2(o.size[0]), m2(o.size[1]), m2(o.size[2]), m2(o.p1[2]), m2(o.p99[2]), m2(o.mean[0]), m2(o.mean[1]), m2(o.mean[2])].concat(o.rgb.map(Math.round)))), e.currentTarget));
+    drawObjs();
+  }
+
+  async function loadScan(files) {
+    const st = $('sstatus'), pw = $('sprogwrap'), pr = $('sprog');
+    st.className = 'status'; pw.hidden = false; pr.style.width = '1%';
+    const step = +$('mode').value || 20;
+    const targets = files.filter(f => SCAN.parseName(f.webkitRelativePath || f.name));
+    if (!targets.length) {
+      pw.hidden = true; st.className = 'status err';
+      st.textContent = 'No classified point files found. Choose the folder that holds S1, S2 and so on, with files like chair_1.txt inside.';
+      return;
+    }
+    st.textContent = 'Found ' + fmtN(targets.length) + ' object files (' + fmtBytes(targets.reduce((a, f) => a + f.size, 0)) + '). Measuring.';
+    try {
+      const res = await SCAN.scanFolder(files, { step, collect: true }, p => {
+        pr.style.width = Math.max(1, Math.round(100 * p.bytes / Math.max(1, p.total))) + '%';
+        st.textContent = 'File ' + (p.files + 1) + ' of ' + p.of + ': ' + p.name.split('/').slice(-2).join('/') + '  (' + fmtBytes(p.bytes) + ' of ' + fmtBytes(p.total) + ', ' + Math.round(p.elapsed) + ' s)';
+      });
+      renderScan(res);
+      st.textContent = 'Measured ' + fmtN(res.objs.length) + ' objects in ' + res.seconds.toFixed(1) + ' s';
+      setTimeout(() => { pw.hidden = true; }, 600);
+      window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
+    } catch (e) {
+      pw.hidden = true; st.className = 'status err';
+      st.textContent = 'Could not read the scan files. ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  function wire(vm) {
+    document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
+    const strings = vm.strings.map(x => ({ s: x[0], n: x[1], k: kindOf(x[0]) }));
+    const kinds = Array.from(new Set(strings.map(x => x.k))).sort();
+    const sel = $('kind');
+    kinds.forEach(k => { const o = document.createElement('option'); o.value = k; o.textContent = k; sel.appendChild(o); });
+    let shown = [];
+    function draw() {
+      const q = $('q').value.trim().toLowerCase(), k = sel.value;
+      const rows = strings.filter(x => (!k || x.k === k) && (!q || x.s.toLowerCase().includes(q)));
+      shown = rows;
+      const cap = 400;
+      const part = rows.slice(0, cap);
+      $('qtable').innerHTML = table(['Text', 'Kind', 'Mentions'], part.map(x => [esc(x.s), '<span class="tag">' + esc(x.k) + '</span>', fmtN(x.n)]), { right: [2], mono: [0], wrap: [0] });
+      $('qcount').textContent = rows.length > cap ? 'Showing first ' + cap + ' of ' + fmtN(rows.length) : fmtN(rows.length) + ' shown';
+    }
+    $('q').addEventListener('input', draw); sel.addEventListener('change', draw);
+    $('qcopy').addEventListener('click', e => copyText(toCsv(['Text', 'Kind', 'Mentions'], shown.map(x => [x.s, x.k, x.n])), e.currentTarget));
+    draw();
+  }
+
+  function copyText(text, btn) {
+    const label = btn.textContent;
+    const done = ok => {
+      if (ok) { btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = label; }, 1500); }
+      else {
+        const ta = $('csvfall'); ta.hidden = false; ta.value = text; ta.focus(); ta.select();
+        btn.textContent = 'Press Ctrl+C'; setTimeout(() => { btn.textContent = label; }, 2500);
+      }
+    };
+    try { navigator.clipboard.writeText(text).then(() => done(true), () => done(false)); } catch (e) { done(false); }
+  }
+
+  async function load(file) {
+    const st = $('status'), pw = $('progwrap'), pr = $('prog');
+    st.className = 'status'; pw.hidden = false; pr.style.width = '2%';
+    st.textContent = 'Reading ' + file.name + ' (' + fmtBytes(file.size) + ')';
+    try {
+      if (/\.ifc$/i.test(file.name)) {
+        st.textContent = 'Reading IFC text';
+        pr.style.width = '30%';
+        const text = await file.text();
+        pr.style.width = '60%';
+        await new Promise(r => setTimeout(r, 20));
+        const r = IFC.readIfc(text);
+        r.fileName = file.name; r.fileSize = file.size;
+        renderIfc(r, null);
+        st.textContent = 'Loaded ' + file.name;
+        setTimeout(() => { pw.hidden = true; }, 600);
+        window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
+        return;
+      }
+      const buf = await file.arrayBuffer();
+      const res = await RVT.parseRvt(buf, file.name, (m, f) => { st.textContent = m; pr.style.width = Math.round(f * 100) + '%'; });
+      const vm = RVT.viewModel(res, 0);
+      render(vm, null);
+      st.textContent = 'Loaded ' + file.name;
+      setTimeout(() => { pw.hidden = true; }, 600);
+      window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
+    } catch (e) {
+      pw.hidden = true; st.className = 'status err';
+      st.textContent = 'Could not read this file. ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  const dirInp = $('dir');
+  dirInp.addEventListener('change', () => { if (dirInp.files.length) loadScan(Array.from(dirInp.files)); });
+  $('dirpick').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); dirInp.click(); } });
+  const drop = $('drop'), inp = $('file');
+  inp.addEventListener('change', () => { if (inp.files[0]) load(inp.files[0]); });
+  $('pick').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
+  ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
+
+  const GO_IFC = ' <button class="ghost" type="button" data-go="ifc" style="margin-left:8px;padding:3px 10px">See the IFC example</button>';
+  const GO_RVT = ' <button class="ghost" type="button" data-go="rvt" style="margin-left:8px;padding:3px 10px">See the Revit example</button>';
+  function showRvtSample() { render(SAMPLE, 'Example result for <strong>racbasicsampleproject.rvt</strong>, one of Autodesk\'s Revit 2024 sample files. Load your own file above to replace it.' + GO_IFC); }
+  function showIfcSample() { renderIfc(SAMPLE_IFC, 'Example result for <strong>L1_C106_IFC.ifc</strong>, a Revit 2023 export of one classroom. Load your own file above to replace it.' + GO_RVT); }
+  $('out').addEventListener('click', e => {
+    const b = e.target.closest('[data-go]');
+    if (b) { if (b.dataset.go === 'ifc') showIfcSample(); else showRvtSample(); return; }
+    const row = e.target.closest('tr.row');
+    if (row && row.nextElementSibling && row.nextElementSibling.classList.contains('det')) row.nextElementSibling.hidden = !row.nextElementSibling.hidden;
+  });
+  showRvtSample();
+})();
+</script>

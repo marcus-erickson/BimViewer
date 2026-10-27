@@ -1,0 +1,12 @@
+const fs=require('fs'); require('../src/ifc.js');
+const f=(process.env.BIM_SAMPLES||'samples')+'/BIM sample/L1_C106_IFC.ifc';
+const t=Date.now(); const r=IFC.readIfc(fs.readFileSync(f,'utf8')); console.log('ms',Date.now()-t);
+console.log(r.header, r.app, r.project, r.units, r.totals);
+console.log('HIER',r.hierarchy);
+console.log('CLASSES',r.classes);
+console.log('TYPES',r.types.length, r.types.slice(0,12).map(x=>x.cls+'|'+x.name.slice(0,60)+'|'+x.count));
+console.log('MATS',r.materials);
+console.log('PSETS',r.psets.map(p=>p.name+'('+p.elements+'): '+p.props.slice(0,8).join(',')).join('\n'));
+console.log('READY'); for(const x of r.readiness) console.log(x.cls.padEnd(28),x.n,JSON.stringify(x.pct));
+console.log('CENSUS',r.census.slice(0,8).map(x=>x.type+':'+x.count).join(' '));
+const w=r.elements.find(e=>e.cls==="IfcWallStandardCase")||r.elements[0]; console.log(JSON.stringify(w,null,1).slice(0,2500));

@@ -1,0 +1,6 @@
+node_modules/
+samples/
+__pycache__/
+*.pkl
+/shot_*.png
+tests/shot_*.png
