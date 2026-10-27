@@ -85,6 +85,8 @@ section.card { background: var(--surface); border: 1px solid var(--rule); border
 .tw { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; max-height: 420px; overflow-y: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+th[data-sort] { cursor: pointer; user-select: none; }
+th[data-sort]:hover { color: var(--fg); }
 th { position: sticky; top: 0; background: var(--surface); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); white-space: nowrap; box-shadow: 0 1px 0 var(--rule); }
 td.r, th.r { text-align: right; }
 td.k { color: var(--muted); white-space: nowrap; }
@@ -699,7 +701,7 @@ tr.det td { background: var(--bg); }
     html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables rest on it and are table height or lower, doors are door-sized, lights sit near the ceiling, floors are flat, and any segment far larger or smaller than others in its class.</p></section>';
 
     // objects
-    html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements.</p></div>';
+    html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements. Click a column heading to sort, again to reverse, and a third time to restore the original order.</p></div>';
     html += '<div class="tools"><label for="oq" class="cap">Filter</label><input id="oq" class="search" type="search" placeholder="Try chair, S2, light" autocomplete="off"><label class="cap" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="oflag"> Flagged only</label><span class="cap" id="ocount"></span><button class="ghost" type="button" id="ocopy">Copy shown as CSV</button></div>';
     html += '<div id="otable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
 
@@ -729,16 +731,37 @@ tr.det td { background: var(--bg); }
       '<span>Trimmed size (m)</span><span class="mono">' + size3(o.size) + '</span><span>Trimmed size (ft)</span><span class="mono">' + feet3(o.size) + '</span>' +
       '<span>Center</span><span class="mono">' + o.mean.map(m2).join(', ') + '</span><span>Average color</span><span>' + swatch(o.rgb) + o.rgb.map(Math.round).join(', ') + '</span><span>Average intensity</span><span class="mono">' + Math.round(o.inten) + '</span>' + (res.qa.flags.has(o) ? '<span>QA</span><span>' + res.qa.flags.get(o).map(x => esc(x.msg)).join('<br>') + '</span>' : '') + '</div>';
     let shown = [];
+    const sortSt = { key: null, dir: 1 };
+    const sevRank = o => { const f = res.qa.flags.get(o); return f ? Math.min.apply(null, f.map(x => ({ high: 0, med: 1, low: 2 })[x.sev])) : 9; };
+    const SORTS = {
+      name: (a, b) => a.cls.localeCompare(b.cls) || a.idx - b.idx,
+      slice: (a, b) => a.slice.localeCompare(b.slice, undefined, { numeric: true }) || a.cls.localeCompare(b.cls) || a.idx - b.idx,
+      points: (a, b) => a.points - b.points,
+      size: (a, b) => Math.max.apply(null, a.size) - Math.max.apply(null, b.size),
+      z: (a, b) => a.p1[2] - b.p1[2],
+      qa: (a, b) => sevRank(a) - sevRank(b)
+    };
+    const HEADS = [['name', 'Object', ''], ['slice', 'Slice', ''], ['points', 'Points', 'r'], ['size', 'Size X × Y × Z (m)', ''], ['z', 'Floor to top Z (m)', ''], ['qa', 'QA', '']];
     function drawObjs() {
       const q = $('oq').value.trim().toLowerCase();
       const fo = $('oflag').checked;
       shown = objs.filter(o => (!q || (o.name + ' ' + o.slice).toLowerCase().includes(q)) && (!fo || res.qa.flags.has(o)));
+      if (sortSt.key) { const f = SORTS[sortSt.key]; shown = shown.slice().sort((a, b) => f(a, b) * sortSt.dir); }
       const part = shown.slice(0, 400);
-      $('otable').innerHTML = '<div class="tw"><table><thead><tr><th>Object</th><th>Slice</th><th class="r">Points</th><th>Size X × Y × Z (m)</th><th>Floor to top Z (m)</th><th>QA</th></tr></thead><tbody>' +
+      $('otable').innerHTML = '<div class="tw"><table><thead><tr>' + HEADS.map(h => '<th data-sort="' + h[0] + '" tabindex="0" role="columnheader" class="' + h[2] + '" aria-sort="' + (sortSt.key === h[0] ? (sortSt.dir > 0 ? 'ascending' : 'descending') : 'none') + '" title="Click to sort">' + h[1] + (sortSt.key === h[0] ? (sortSt.dir > 0 ? ' ▲' : ' ▼') : '') + '</th>').join('') + '</tr></thead><tbody>' +
         part.map(o => '<tr class="row"><td class="mono nw">' + swatch(o.rgb) + esc(o.name) + '</td><td>' + esc(o.slice) + '</td><td class="r num">' + fmtN(o.points) + '</td><td class="mono nw">' + size3(o.size) + '</td><td class="mono nw">' + m2(o.p1[2]) + ' to ' + m2(o.p99[2]) + '</td><td>' + (res.qa.flags.has(o) ? sevTag(res.qa.flags.get(o)[0].sev) : '') + '</td></tr><tr class="det" hidden><td colspan="6">' + det(o) + '</td></tr>').join('') + '</tbody></table></div>';
       $('ocount').textContent = shown.length > 400 ? 'Showing first 400 of ' + fmtN(shown.length) : fmtN(shown.length) + ' shown';
     }
     $('oq').addEventListener('input', drawObjs); $('oflag').addEventListener('change', drawObjs);
+    const clickSort = e => {
+      const th = e.target.closest('th[data-sort]'); if (!th) return;
+      if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      const k = th.dataset.sort;
+      if (sortSt.key !== k) { sortSt.key = k; sortSt.dir = 1; } else if (sortSt.dir === 1) sortSt.dir = -1; else sortSt.key = null;
+      drawObjs();
+    };
+    $('otable').addEventListener('click', clickSort); $('otable').addEventListener('keydown', clickSort);
     $('ocopy').addEventListener('click', e => copyText(toCsv(['Object', 'Class', 'Slice', 'Points', 'Size X m', 'Size Y m', 'Size Z m', 'Z low m', 'Z high m', 'Center X', 'Center Y', 'Center Z', 'R', 'G', 'B'], shown.map(o => [o.name, o.cls, o.slice, o.points, m2(o.size[0]), m2(o.size[1]), m2(o.size[2]), m2(o.p1[2]), m2(o.p99[2]), m2(o.mean[0]), m2(o.mean[1]), m2(o.mean[2])].concat(o.rgb.map(Math.round)))), e.currentTarget));
     drawObjs();
   }
