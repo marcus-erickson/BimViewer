@@ -704,7 +704,7 @@ tr.det td { background: var(--bg); }
       html += table(['Rule', 'Level', 'Segments'], Q.rules.map(r => [esc(r.rule), sevTag(r.sev), fmtN(r.n)]), { right: [2] });
       html += '<div id="qaflags" style="margin-top:12px"></div>';
     }
-    html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables are table height or lower (their height off the floor is not checked), doors are door-sized, lights sit near the ceiling, floors are thin and flat, and any chair, table, light or similar item far larger or smaller than others of its class (walls, floors and ceilings are not compared this way because their sizes vary).</p></section>';
+    html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables are table height or lower (their height off the floor is not checked), doors are door-sized, lights sit near the ceiling, floors are thin and flat, any item whose size, shape and height match a different class better than its own label (for example a chair-shaped segment labeled window), and any chair, table, light or similar item far larger or smaller than others of its class (walls, floors and ceilings are not compared this way because their sizes vary).</p></section>';
 
     // objects
     html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements. Click a column heading to sort, again to reverse, and a third time to restore the original order.</p></div>';

@@ -211,6 +211,42 @@
         else if (d < md / 3 && md > 0.6) add(o, 'Smaller than its peers', 'low', 'Longest side ' + f1(d) + ' m is under a third of the typical ' + cls + ' (' + f1(md) + ' m).');
       }
     }
+
+    // Shape matching: does a segment fit another class better than its own label?
+    const SKIP = new Set(['wall', 'floor', 'ceiling', 'unknown', 'utilities']);
+    const feat = o => {
+      const sx = o.size[0], sy = o.size[1];
+      const b = Math.max(-0.5, o.p1[2] - (o.cls === 'floor' ? floor : floorUnder(o)));
+      return [Math.log(Math.max(sx, sy) + 0.05), Math.log(Math.min(sx, sy) + 0.05), Math.log(o.size[2] + 0.05), b];
+    };
+    const FLOORS = [0.3, 0.3, 0.3, 0.3];
+    const fmap = new Map(objs.filter(o => o.points >= 100 && !SKIP.has(o.cls)).map(o => [o, feat(o)]));
+    const profile = (cls, except) => {
+      const rows = [];
+      for (const o of byCls.get(cls) || []) if (o !== except && fmap.has(o)) rows.push(fmap.get(o));
+      if (rows.length < 3) return null;
+      const med = [0, 1, 2, 3].map(k => median(rows.map(r => r[k])));
+      const sd = [0, 1, 2, 3].map(k => Math.max(1.4826 * median(rows.map(r => Math.abs(r[k] - med[k]))), FLOORS[k]));
+      return { med, sd, n: rows.length };
+    };
+    const dist = (f, pr) => f.reduce((a, v, k) => a + Math.pow((v - pr.med[k]) / pr.sd[k], 2), 0);
+    const shapeCls = Array.from(byCls.keys()).filter(c => !SKIP.has(c) && (byCls.get(c) || []).filter(o => fmap.has(o)).length >= 4);
+    const typical = pr => 'typical ' + '' + [Math.exp(pr.med[0]) - 0.05, Math.exp(pr.med[1]) - 0.05, Math.exp(pr.med[2]) - 0.05].map(v => f1(Math.max(0, v))).join(' x ') + ' m';
+    for (const o of objs) {
+      const f = fmap.get(o); if (!f) continue;
+      const own = profile(o.cls, o); if (!own) continue;
+      const dOwn = dist(f, own);
+      if (dOwn < 12) continue;
+      let best = null;
+      for (const c of shapeCls) {
+        if (c === o.cls) continue;
+        const pr = profile(c, o); if (!pr) continue;
+        const d = dist(f, pr);
+        if (!best || d < best.d) best = { c, d, pr };
+      }
+      if (best && best.d < 6 && best.d < dOwn * 0.5)
+        add(o, 'Shape fits another class', 'med', 'Shape and height match ' + best.c + ' (' + typical(best.pr) + ') much better than ' + o.cls + ' (' + typical(own) + ' here). This segment is ' + f1(Math.max(o.size[0], o.size[1])) + ' x ' + f1(Math.min(o.size[0], o.size[1])) + ' x ' + f1(o.size[2]) + ' m.');
+    }
     const rank = { high: 0, med: 1, low: 2 };
     const sev = o => { const a = flags.get(o); return a ? Math.min.apply(null, a.map(x => rank[x.sev])) : 9; };
     const flagged = Array.from(flags.keys()).sort((a, b) => sev(a) - sev(b) || a.cls.localeCompare(b.cls) || a.idx - b.idx);
