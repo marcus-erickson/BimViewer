@@ -466,12 +466,16 @@ tr.det td { background: var(--bg); }
       viewer = new Viewer3D($('vcanvas'), groups, Object.assign({ onPick: showSel }, sh ? { bounds: sh } : {}));
     } catch (e) { info.textContent = 'Could not start the 3D view. ' + (e.message || e); return; }
     viewer.setMode(+$('vmode').value);
-    info.textContent = fmtN(total) + ' points shown';
+    info.textContent = fmtN(total) + ' of ' + fmtN(total) + ' sampled points shown';
     $('vclasses').innerHTML = groups.map(g => '<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.88rem"><input type="checkbox" data-vc="' + esc(g.cls) + '" checked>' +
       '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:rgb(' + g.color.join(',') + ')"></span>' + esc(g.cls) + ' <span class="cap">' + fmtN(g.n) + '</span></label>').join('');
     document.querySelectorAll('[data-vc]').forEach(cb => cb.addEventListener('change', () => viewer.setVisible(cb.dataset.vc, cb.checked)));
     $('vmode').addEventListener('change', e => viewer.setMode(+e.target.value));
     $('vsize').addEventListener('input', e => viewer.setSize(+e.target.value));
+    const showInfo = () => { const f = +$('vdetail').value / 100; info.textContent = fmtN(Math.round(total * f)) + ' of ' + fmtN(total) + ' sampled points shown'; };
+    $('vdetail').addEventListener('input', e => { viewer.setDetail(+e.target.value / 100); showInfo(); });
+    $('vfill').addEventListener('change', e => viewer.setFill(e.target.checked));
+    $('vshade').addEventListener('change', e => viewer.setShade(e.target.checked));
     $('vreset').addEventListener('click', () => viewer.reset());
     const all = v => { document.querySelectorAll('[data-vc]').forEach(cb => { cb.checked = v; viewer.setVisible(cb.dataset.vc, v); }); };
     $('vall').addEventListener('click', () => all(true)); $('vnone').addEventListener('click', () => all(false));
@@ -643,6 +647,8 @@ tr.det td { background: var(--bg); }
     html += '<section class="card"><div class="head"><h2>3D view</h2><p class="sub">Drag to rotate, scroll to zoom, right-drag or shift-drag to move, click a point to select its object. Shows a sample of the points.</p></div>' +
       '<div class="tools"><label for="vmode" class="cap">Color</label><select id="vmode" class="search" style="width:auto"><option value="1">By class</option><option value="0">True color</option><option value="2">By height</option></select>' +
       '<label for="vsize" class="cap">Point size</label><input id="vsize" type="range" min="1" max="6" step="0.5" value="2" style="width:120px">' +
+      '<label for="vdetail" class="cap">Detail</label><input id="vdetail" type="range" min="5" max="100" step="5" value="100" style="width:100px">' +
+      '<label class="cap" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="vfill"> Fill gaps</label><label class="cap" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="vshade"> Shading</label>' +
       '<button class="ghost" type="button" id="vreset">Reset view</button><button class="ghost" type="button" id="vall">All on</button><button class="ghost" type="button" id="vnone">All off</button><span class="cap" id="vinfo"></span></div>' +
       '<div id="vclasses" class="tools" style="gap:6px 14px"></div>' +
       '<div id="ovbox" style="margin:8px 0"></div>' +

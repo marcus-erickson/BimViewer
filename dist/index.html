@@ -1079,7 +1079,7 @@ tr.det td { background: var(--bg); }
       sum: [0, 0, 0], rgb: [0, 0, 0], inten: 0
     };
     const rx = [], ry = [], rz = [];
-    const cap = collect ? Math.max(1500, Math.min(120000, Math.round(file.size / 3000))) : 0;
+    const cap = collect ? Math.max(4000, Math.min(200000, Math.round(file.size / 500))) : 0;
     const px = new Float32Array(cap * 3), pc = new Uint8Array(cap * 3);
     let pn = 0, keep = 1, kc = 0;
     if (cap) step = Math.max(1, Math.min(step, Math.floor(file.size / 40 / cap)));
@@ -1271,12 +1271,12 @@ tr.det td { background: var(--bg); }
   const VS = `
     attribute vec3 aPos; attribute vec3 aCol;
     uniform mat4 uMVP; uniform float uSize; uniform float uMode; uniform vec3 uClass; uniform vec3 uCenter;
-    uniform float uZmin; uniform float uZmax; uniform vec3 uOff; uniform vec2 uRot; varying vec3 vCol;
+    uniform float uZmin; uniform float uZmax; uniform vec3 uOff; uniform vec2 uRot; uniform float uPersp; uniform float uK; varying vec3 vCol;
     void main() {
       vec3 q = vec3(uRot.x * aPos.x - uRot.y * aPos.y, uRot.y * aPos.x + uRot.x * aPos.y, aPos.z) + uOff;
       vec4 p = uMVP * vec4(q, 1.0);
       gl_Position = p;
-      gl_PointSize = uSize;
+      gl_PointSize = uPersp > 0.5 ? clamp(uSize * uK / max(p.w, 0.01), 1.5, 48.0) : uSize;
       if (uMode < 0.5) vCol = aCol;
       else if (uMode < 1.5) vCol = uClass;
       else {
@@ -1286,10 +1286,19 @@ tr.det td { background: var(--bg); }
       }
     }`;
   const FS = `
-    precision mediump float; varying vec3 vCol; uniform float uRound;
+    precision mediump float; varying vec3 vCol; uniform float uRound; uniform float uShade;
     void main() {
-      if (uRound > 0.5) { vec2 d = gl_PointCoord - vec2(0.5); if (dot(d, d) > 0.25) discard; }
-      gl_FragColor = vec4(vCol, 1.0);
+      vec3 col = vCol;
+      if (uRound > 0.5) {
+        vec2 d = gl_PointCoord - vec2(0.5);
+        if (dot(d, d) > 0.25) discard;
+        if (uShade > 0.5) {
+          vec2 q = d * 2.0; float z = sqrt(max(0.0, 1.0 - dot(q, q)));
+          vec3 n = normalize(vec3(q.x, -q.y, z));
+          col *= 0.45 + 0.55 * max(dot(n, normalize(vec3(-0.4, 0.5, 0.75))), 0.0);
+        }
+      }
+      gl_FragColor = vec4(col, 1.0);
     }`;
 
   function mul(a, b) {
@@ -1328,8 +1337,25 @@ tr.det td { background: var(--bg); }
     gl.useProgram(prog);
     const loc = { pos: gl.getAttribLocation(prog, 'aPos'), col: gl.getAttribLocation(prog, 'aCol') };
     const U = n => gl.getUniformLocation(prog, n);
-    const un = { mvp: U('uMVP'), size: U('uSize'), mode: U('uMode'), cls: U('uClass'), center: U('uCenter'), zmin: U('uZmin'), zmax: U('uZmax'), off: U('uOff'), rot: U('uRot'), round: U('uRound') };
+    const un = { mvp: U('uMVP'), size: U('uSize'), mode: U('uMode'), cls: U('uClass'), center: U('uCenter'), zmin: U('uZmin'), zmax: U('uZmax'), off: U('uOff'), rot: U('uRot'), round: U('uRound'), persp: U('uPersp'), k: U('uK'), shade: U('uShade') };
 
+    // Reorder each object's points so that any prefix is an even spread (used by the Detail slider)
+    const gcd = (a, b) => { while (b) { const t = a % b; a = b; b = t; } return a; };
+    for (const g of groups) {
+      if (!g.ranges) continue;
+      const nx = new Float32Array(g.xyz.length), nc = new Uint8Array(g.rgb.length);
+      nx.set(g.xyz); nc.set(g.rgb);
+      for (const r of g.ranges) {
+        const n = r.count; if (n < 3) continue;
+        let P = Math.floor(n * 0.6180339887) | 1; while (gcd(P, n) !== 1) P += 2;
+        for (let i = 0; i < n; i++) {
+          const j = r.start + (i * P) % n, d = r.start + i;
+          nx[d * 3] = g.xyz[j * 3]; nx[d * 3 + 1] = g.xyz[j * 3 + 1]; nx[d * 3 + 2] = g.xyz[j * 3 + 2];
+          nc[d * 3] = g.rgb[j * 3]; nc[d * 3 + 1] = g.rgb[j * 3 + 1]; nc[d * 3 + 2] = g.rgb[j * 3 + 2];
+        }
+      }
+      g.xyz = nx; g.rgb = nc;
+    }
     // bounds
     const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
     for (const g of groups) for (let i = 0; i < g.n; i++) for (let k = 0; k < 3; k++) { const v = g.xyz[i * 3 + k]; if (v < lo[k]) lo[k] = v; if (v > hi[k]) hi[k] = v; }
@@ -1349,7 +1375,7 @@ tr.det td { background: var(--bg); }
     const ov = { on: false, items: [], pose: { cx: center[0], cy: center[1], cz: center[2], rot: 0 }, center: null, lo: null, hi: null };
     let sel = null, selBox = null;
     const view = { az: -1.05, el: 0.6, dist: ext * 1.3, tx: 0, ty: 0, tz: 0 };
-    const state = { mode: 0, size: 2, dirty: true };
+    const state = { mode: 0, size: 2, dirty: true, detail: 1, fill: false, shade: false };
     const home = Object.assign({}, view);
     let raf = 0;
 
@@ -1431,7 +1457,9 @@ tr.det td { background: var(--bg); }
       gl.uniformMatrix4fv(un.mvp, false, m);
       last.m = m; last.w = w; last.h = h; last.dpr = dpr;
       gl.uniform3f(un.off, 0, 0, 0); gl.uniform2f(un.rot, 1, 0); gl.uniform1f(un.round, 1);
-      gl.uniform1f(un.size, state.size * dpr);
+      gl.uniform1f(un.size, state.fill ? state.size : state.size * dpr);
+      gl.uniform1f(un.persp, state.fill ? 1 : 0); gl.uniform1f(un.shade, state.shade ? 1 : 0);
+      gl.uniform1f(un.k, h / (2 * Math.tan(0.4)) * 0.02);
       gl.uniform1f(un.mode, state.mode);
       gl.uniform3f(un.center, center[0], center[1], center[2]);
       gl.uniform1f(un.zmin, lo[2]); gl.uniform1f(un.zmax, hi[2]);
@@ -1441,8 +1469,10 @@ tr.det td { background: var(--bg); }
         gl.uniform3f(un.cls, b.color[0], b.color[1], b.color[2]);
         gl.bindBuffer(gl.ARRAY_BUFFER, b.p); gl.vertexAttribPointer(loc.pos, 3, gl.FLOAT, false, 0, 0);
         gl.bindBuffer(gl.ARRAY_BUFFER, b.c); gl.vertexAttribPointer(loc.col, 3, gl.UNSIGNED_BYTE, true, 0, 0);
-        gl.drawArrays(gl.POINTS, 0, b.n);
+        if (state.detail >= 0.999 || !b.ranges.length) gl.drawArrays(gl.POINTS, 0, b.n);
+        else for (const r of b.ranges) { const c = Math.max(1, Math.floor(r.count * state.detail)); gl.drawArrays(gl.POINTS, r.start, c); }
       }
+      gl.uniform1f(un.persp, 0); gl.uniform1f(un.shade, 0); gl.uniform1f(un.size, state.size * dpr);
       if (sel) {
         const b = bufs[sel.gi];
         if (b && b.visible) {
@@ -1521,6 +1551,9 @@ tr.det td { background: var(--bg); }
       groups: bufs,
       setMode(m) { state.mode = m; redraw(); },
       setSize(s) { state.size = s; redraw(); },
+      setDetail(f) { state.detail = f; redraw(); },
+      setFill(v) { state.fill = v; redraw(); },
+      setShade(v) { state.shade = v; redraw(); },
       setVisible(cls, v) { for (const b of bufs) if (b.cls === cls) b.visible = v; redraw(); },
       reset() { Object.assign(view, home); redraw(); },
       render: draw,
@@ -1830,12 +1863,16 @@ tr.det td { background: var(--bg); }
       viewer = new Viewer3D($('vcanvas'), groups, Object.assign({ onPick: showSel }, sh ? { bounds: sh } : {}));
     } catch (e) { info.textContent = 'Could not start the 3D view. ' + (e.message || e); return; }
     viewer.setMode(+$('vmode').value);
-    info.textContent = fmtN(total) + ' points shown';
+    info.textContent = fmtN(total) + ' of ' + fmtN(total) + ' sampled points shown';
     $('vclasses').innerHTML = groups.map(g => '<label style="display:inline-flex;gap:6px;align-items:center;font-size:0.88rem"><input type="checkbox" data-vc="' + esc(g.cls) + '" checked>' +
       '<span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:rgb(' + g.color.join(',') + ')"></span>' + esc(g.cls) + ' <span class="cap">' + fmtN(g.n) + '</span></label>').join('');
     document.querySelectorAll('[data-vc]').forEach(cb => cb.addEventListener('change', () => viewer.setVisible(cb.dataset.vc, cb.checked)));
     $('vmode').addEventListener('change', e => viewer.setMode(+e.target.value));
     $('vsize').addEventListener('input', e => viewer.setSize(+e.target.value));
+    const showInfo = () => { const f = +$('vdetail').value / 100; info.textContent = fmtN(Math.round(total * f)) + ' of ' + fmtN(total) + ' sampled points shown'; };
+    $('vdetail').addEventListener('input', e => { viewer.setDetail(+e.target.value / 100); showInfo(); });
+    $('vfill').addEventListener('change', e => viewer.setFill(e.target.checked));
+    $('vshade').addEventListener('change', e => viewer.setShade(e.target.checked));
     $('vreset').addEventListener('click', () => viewer.reset());
     const all = v => { document.querySelectorAll('[data-vc]').forEach(cb => { cb.checked = v; viewer.setVisible(cb.dataset.vc, v); }); };
     $('vall').addEventListener('click', () => all(true)); $('vnone').addEventListener('click', () => all(false));
@@ -2007,6 +2044,8 @@ tr.det td { background: var(--bg); }
     html += '<section class="card"><div class="head"><h2>3D view</h2><p class="sub">Drag to rotate, scroll to zoom, right-drag or shift-drag to move, click a point to select its object. Shows a sample of the points.</p></div>' +
       '<div class="tools"><label for="vmode" class="cap">Color</label><select id="vmode" class="search" style="width:auto"><option value="1">By class</option><option value="0">True color</option><option value="2">By height</option></select>' +
       '<label for="vsize" class="cap">Point size</label><input id="vsize" type="range" min="1" max="6" step="0.5" value="2" style="width:120px">' +
+      '<label for="vdetail" class="cap">Detail</label><input id="vdetail" type="range" min="5" max="100" step="5" value="100" style="width:100px">' +
+      '<label class="cap" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="vfill"> Fill gaps</label><label class="cap" style="display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="vshade"> Shading</label>' +
       '<button class="ghost" type="button" id="vreset">Reset view</button><button class="ghost" type="button" id="vall">All on</button><button class="ghost" type="button" id="vnone">All off</button><span class="cap" id="vinfo"></span></div>' +
       '<div id="vclasses" class="tools" style="gap:6px 14px"></div>' +
       '<div id="ovbox" style="margin:8px 0"></div>' +

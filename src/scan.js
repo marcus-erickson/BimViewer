@@ -49,7 +49,7 @@
       sum: [0, 0, 0], rgb: [0, 0, 0], inten: 0
     };
     const rx = [], ry = [], rz = [];
-    const cap = collect ? Math.max(1500, Math.min(120000, Math.round(file.size / 3000))) : 0;
+    const cap = collect ? Math.max(4000, Math.min(200000, Math.round(file.size / 500))) : 0;
     const px = new Float32Array(cap * 3), pc = new Uint8Array(cap * 3);
     let pn = 0, keep = 1, kc = 0;
     if (cap) step = Math.max(1, Math.min(step, Math.floor(file.size / 40 / cap)));

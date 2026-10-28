@@ -71,7 +71,8 @@ You get:
 - Color by class, true color, or height.
 - Turn classes on and off with the checkboxes.
 - **Click a point** to select its object. The object's points turn white, a yellow box marks its trimmed size, and a panel shows class, slice, point count, size in meters and feet, height range, center, average color and file.
-- The view shows a thinned sample of the points so that large scans stay smooth.
+- The view shows a thinned sample of the points so that large scans stay smooth. The **Detail** slider shows 5% to 100% of that sample.
+- **Fill gaps** draws each point as a disc that grows as you zoom in, so surfaces look more solid. **Shading** gives each disc a lit, rounded look. Both change only how points are drawn, not the data, and measurements always use the real points.
 
 ![Scan with IFC outline](docs/img/scan-ifc-overlay.png)
 
