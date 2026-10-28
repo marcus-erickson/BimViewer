@@ -202,7 +202,7 @@
       if (o.cls === 'wall' && h < 0.3 && dim < 1.0) add(o, 'Sliver wall', 'low', 'A wall segment only ' + f1(h) + ' m tall and ' + f1(dim) + ' m wide.');
     }
     for (const [cls, list] of byCls) {
-      if (list.length < 4) continue;
+      if (list.length < 4 || cls === 'wall' || cls === 'floor' || cls === 'ceiling') continue; // shell pieces vary widely in length
       const md = median(list.map(o => Math.max(o.size[0], o.size[1], o.size[2])));
       if (!(md > 0.05)) continue;
       for (const o of list) {
