@@ -14,13 +14,21 @@ Everything runs in the browser. No file is uploaded anywhere.
 
 1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host).
 2. The page opens with built-in examples (a Revit sample and an IFC sample), so you can look around before loading anything.
-3. Load your own file with the buttons at the top.
+3. Load your own file with the two Open boxes on the left.
 
 The page loads one small library (pako 1.0.11) from cdnjs, so it needs an internet connection the first time.
 
 You do not need Node, Python or Revit to use it. Those are only needed if you change the code.
 
 ## Using it
+
+The page has a menu on the left and one screen at a time on the right. The two Open boxes at the top of the menu load a Revit or IFC file, or a scan folder. Below them is a list of screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
+
+| File type | Screens |
+|---|---|
+| Revit | Overview, Readiness, Inside the file, Names and units, Text and links, Limits |
+| IFC | Overview, Model contents, Readiness, Types and materials, Property sets, Elements, Limits |
+| Scan folder | 3D view, Summary, Classes and model, Label checks (with a count of flags), All objects, Limits |
 
 ### Revit files
 
@@ -91,7 +99,9 @@ Treat a low alignment score as a sign to adjust by eye. Auto-align has only been
 
 ### Label sanity checks
 
-The scan card flags segments whose label does not match their shape, using size and height above the floor under each object, so a room with a pit or raised platform is handled. Examples: a chair-sized segment labeled window, a chair taller than 1.5 m, a light near the floor, a segment whose size, shape and height fit a different class much better than its own label (it needs at least 3 other segments of its own class and 4 of the other class to judge), or a chair far larger or smaller than the other chairs. Pieces that are only a flat surface (such as a tabletop without legs) or that touch the edge of their slice are noted as probably partial. Windows are not checked for height because floor-to-ceiling glass is normal, and walls, floors, lights and tables are not compared with their peers because their sizes vary. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
+The Label checks screen flags segments whose label does not match their shape, using size and height above the floor under each object, so a room with a pit or raised platform is handled. Examples: a chair-sized segment labeled window, a chair taller than 1.5 m, a light near the floor, a segment whose size, shape and height fit a different class much better than its own label (it needs at least 3 other segments of its own class and 4 of the other class to judge), or a chair far larger or smaller than the other chairs. Pieces that are only a flat surface (such as a tabletop without legs) or that touch the edge of their slice are noted as probably partial. Windows are not checked for height because floor-to-ceiling glass is normal, and walls, floors, lights and tables are not compared with their peers because their sizes vary. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
+
+![Label checks](docs/img/label-checks.png)
 
 These are rules of thumb. A flag means the label and the shape disagree, not which one is wrong. The thresholds live in the `RULES` table in `src/scan.js` and are easy to adjust.
 
@@ -110,7 +120,7 @@ tools/               Scripts that regenerate the embedded examples
 tests/               Node and browser tests
 research/            Python scripts used to explore the Revit file format
 docs/img/            Screenshots
-build.py             Assembles dist/index.html
+build.py             Assembles dist/index.html (add --fragment OUT for a copy without the html wrapper)
 ```
 
 ## Development
@@ -139,6 +149,7 @@ samples/
 export BIM_SAMPLES=/path/to/samples
 node tests/tifc.js          # IFC audit on the sample IFC
 node tests/tqa.js           # scan measurements and QA flags
+node tests/pw_layout.js     # browser test: left menu and screens for Revit, IFC and scan, desktop and phone
 node tests/pw8.js           # browser test: load a scan folder, QA list, Show in 3D, phone width
 node tests/pw5.js           # browser test: click to select and the IFC overlay
 node tools/mksample.js      # regenerate data/sample.json from a Revit file

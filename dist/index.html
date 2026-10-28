@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BIM File Reader</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -36,7 +41,7 @@ body {
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
 }
-.wrap { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+.wrap { max-width: 1560px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 h1 { font-size: 1.9rem; font-weight: 600; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
 h2 { font-size: 1.15rem; font-weight: 600; margin: 0; }
 p { margin: 0; }
@@ -100,13 +105,40 @@ tr:last-child td { border-bottom: 0; }
 .tag { display: inline-block; font-size: 0.75rem; padding: 1px 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
 .csvbox { width: 100%; height: 120px; font-family: var(--font-data); font-size: 0.8rem; background: var(--bg); color: var(--fg); border: 1px solid var(--rule); border-radius: 4px; }
 .vwrap { background: #0d1419; border-radius: 4px; overflow: hidden; }
-#vcanvas { display: block; width: 100%; height: min(62vh, 560px); min-height: 320px; cursor: grab; }
+#vcanvas { display: block; width: 100%; height: clamp(360px, calc(100vh - 330px), 780px); cursor: grab; }
 #vcanvas:active { cursor: grabbing; }
 .selbox { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 4px; }
 .sl { display: flex; align-items: center; gap: 8px; flex: 1 1 230px; font-size: 0.88rem; }
 .sl input[type=range] { flex: 1; min-width: 80px; }
 .sl .v { min-width: 4.5em; text-align: right; font-family: var(--font-data); font-size: 0.82rem; }
 details summary { cursor: pointer; font-weight: 500; }
+.app { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 22px; align-items: start; }
+.side { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 2px; }
+.main { min-width: 0; }
+.side .drop { flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 12px; gap: 10px; }
+.side .drop .btn { display: block; text-align: center; }
+.side .drop > div { flex: none !important; }
+.nav { display: flex; flex-direction: column; gap: 3px; }
+.navtitle { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 2px 8px 6px; overflow-wrap: anywhere; }
+.navbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; background: transparent; color: var(--fg); border: 0; border-left: 3px solid transparent; border-radius: 4px; padding: 8px 10px; font-weight: 500; }
+.navbtn:hover { background: var(--accent-soft); }
+.navbtn.on { background: var(--accent-soft); color: var(--accent); border-left-color: var(--accent); }
+.badge { background: var(--accent); color: var(--surface); border-radius: 9px; font-size: 0.75rem; padding: 0 7px; line-height: 1.5; }
+.pre:empty { display: none; }
+.pre { margin-bottom: 16px; }
+.screen { display: flex; flex-direction: column; gap: 22px; }
+.screen[hidden] { display: none; }
+.v2 { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
+.v2 .selbox { margin-top: 0; }
+@media (max-width: 1150px) { .v2 { grid-template-columns: minmax(0, 1fr); } .v2 .selbox { margin-top: 10px; } }
+@media (max-width: 900px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; max-height: none; overflow: visible; }
+  .nav { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .navtitle { display: none; }
+  .navbtn { width: auto; white-space: nowrap; border: 1px solid var(--rule); border-left-width: 1px; }
+  .navbtn.on { border-color: var(--accent); }
+}
 .pc { white-space: nowrap; font-family: var(--font-data); font-size: 0.82rem; }
 .pc .bar { margin-right: 6px; height: 7px; }
 tr.row { cursor: pointer; }
@@ -123,13 +155,15 @@ tr.det td { background: var(--bg); }
 <div class="wrap">
   <header>
     <h1>BIM File Reader</h1>
-    <p class="lede">Open a Revit file (.rvt) or an IFC file (.ifc) and see what can be read from it without Revit. Revit files give project details, the thumbnail, the internal layout and the names stored in the model. IFC files give the real element list with types, materials, properties and a data-readiness audit. Everything runs in your browser and the file never leaves your computer.</p>
+    <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. Everything runs in your browser and your files never leave your computer.</p>
   </header>
 
+  <div class="app">
+  <aside class="side">
   <div class="drop" id="drop">
     <div>
-      <strong>Drop an .rvt or .ifc file here</strong>
-      <div class="hint">Tested on Revit 2024 sample files and a Revit 2023 IFC2X3 export. IFC files are read as text, so very large ones (hundreds of MB) can be slow.</div>
+      <strong>Open a Revit or IFC file</strong>
+      <div class="hint">Drop an .rvt or .ifc file here, or choose one. Very large IFC files can be slow.</div>
     </div>
     <div>
       <label for="file" class="btn" id="pick" role="button" tabindex="0">Choose file</label>
@@ -143,8 +177,8 @@ tr.det td { background: var(--bg); }
 
   <div class="drop" id="scanbox">
     <div style="flex:1 1 320px">
-      <strong>Scan inventory</strong>
-      <div class="hint">Choose the folder of classified point files (subfolders S1, S2, and so on, holding files such as chair_1.txt). Each file is measured as one object. The files are read in your browser and never uploaded.</div>
+      <strong>Open a scan folder</strong>
+      <div class="hint">The folder of classified point files (S1, S2 and so on, holding files like chair_1.txt). Read in your browser, never uploaded.</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="mode" class="cap">Detail</label>
@@ -158,7 +192,10 @@ tr.det td { background: var(--bg); }
     </div>
   </div>
 
-  <div id="out"></div>
+  <nav id="nav" class="nav" aria-label="Screens"></nav>
+  </aside>
+  <main class="main"><div id="out"></div></main>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/1.0.11/pako_inflate.min.js"></script>
@@ -1706,6 +1743,7 @@ tr.det td { background: var(--bg); }
     let html = '';
     if (banner) html += '<div class="banner">' + banner + '</div>';
 
+    html += '<div data-screen="Overview"></div>';
     html += '<div class="top">';
     html += '<div class="thumb-box"><h2>Thumbnail</h2>';
     if (vm.thumb) html += '<img alt="Thumbnail stored in ' + esc(vm.fileName) + '" src="' + vm.thumb.data + '"><div class="cap">' + vm.thumb.w + ' by ' + vm.thumb.h + ' px, ' + fmtBytes(vm.thumb.bytes) + '. Revit saves this small picture of the active view; it is not the model.</div>';
@@ -1719,6 +1757,7 @@ tr.det td { background: var(--bg); }
     html += '<div class="tw"><table><tbody>' + fileRows.map(r => kv(r[0], r[1])).join('') + '</tbody></table></div></section>';
     html += '</div></div>';
 
+    html += '<div data-screen="Readiness"></div>';
     // readiness
     const R = vm.readiness;
     if (R) {
@@ -1730,6 +1769,7 @@ tr.det td { background: var(--bg); }
       html += '<p class="cap">Read this with care. Revit has most of these fields built in, so a field that is not seen is not necessarily missing. And a field that is seen only proves the label exists, not that anyone filled in a value for any element. A loaded classification table means the team could classify elements, not that they did. Checking real values and the percent filled in needs the IFC export.</p></section>';
     }
 
+    html += '<div data-screen="Inside the file"></div>';
     // container
     const maxInf = Math.max.apply(null, vm.container.map(c => c.inflated || c.bytes || 0).concat([1]));
     const crow = vm.container.map(c => {
@@ -1741,6 +1781,7 @@ tr.det td { background: var(--bg); }
     html += table(['Stream', 'Stored', 'Unpacked', 'Blocks', 'Relative size', 'What it holds'], crow, { right: [1, 2, 3], mono: [0] });
     html += '</section>';
 
+    html += '<div data-screen="Names and units"></div>';
     // views + levels
     const a = vm.analysis;
     html += '<div class="grid2">';
@@ -1772,6 +1813,7 @@ tr.det td { background: var(--bg); }
     html += '<p class="cap">The kinds of values properties can hold (length, flow, pipe size, and so on).</p></section>';
     html += '</div>';
 
+    html += '<div data-screen="Text and links"></div>';
     // external
     if (vm.external && vm.external.length) {
       html += '<section class="card"><div class="head"><h2>External references</h2><p class="sub">Linked models, images and libraries the file points to.</p>' +
@@ -1786,6 +1828,7 @@ tr.det td { background: var(--bg); }
       '<select id="kind" class="search" style="max-width:190px"><option value="">All kinds</option></select><span class="cap" id="qcount"></span><button class="ghost" type="button" id="qcopy">Copy shown as CSV</button></div>';
     html += '<div id="qtable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
 
+    html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>Counts of walls, doors, ducts or any other element. Revit keeps those in a binary model format that only Revit itself, or Autodesk\'s cloud tools, can read completely.</li>' +
       '<li>Geometry, sheets as drawn, or parameter values on individual elements.</li>' +
@@ -1793,12 +1836,56 @@ tr.det td { background: var(--bg); }
       'To get element-level data, export the model to IFC from Revit or Autodesk\'s tools and load that file into a reader built for it.</div>';
 
     $('out').innerHTML = html;
+    layoutScreens('revit', 'Revit file: ' + (vm.fileName || ''), {});
     wire(vm);
   }
 
 
   const PCT_KEYS = [['type', 'Has type'], ['material', 'Material'], ['classification', 'Classification'], ['fire', 'Fire rating'], ['maker', 'Maker or model'], ['quantities', 'Quantities'], ['anyPset', 'Any properties']];
   const pctCell = n => '<span class="pc"><span class="bar" style="width:' + Math.round(n * 0.6) + 'px"></span>' + n + '%</span>';
+
+
+  const SCREEN_ORDER = {
+    revit: ['Overview', 'Readiness', 'Inside the file', 'Names and units', 'Text and links', 'Limits'],
+    ifc: ['Overview', 'Model contents', 'Readiness', 'Types and materials', 'Property sets', 'Elements', 'Limits'],
+    scan: ['3D view', 'Summary', 'Classes and model', 'Label checks', 'All objects', 'Limits']
+  };
+  let currentKind = 'revit';
+  function layoutScreens(kind, title, badges) {
+    currentKind = kind;
+    const out = $('out'), kids = Array.from(out.children);
+    const pre = document.createElement('div'); pre.className = 'pre';
+    const map = new Map(); let cur = null;
+    for (const k of kids) {
+      if (k.dataset && k.dataset.screen) { cur = k.dataset.screen; if (!map.has(cur)) map.set(cur, []); continue; }
+      if (cur === null) pre.appendChild(k); else map.get(cur).push(k);
+    }
+    out.innerHTML = '';
+    out.appendChild(pre);
+    const names = (SCREEN_ORDER[kind] || []).filter(n => map.has(n) && map.get(n).length);
+    for (const n of map.keys()) if (!names.includes(n) && map.get(n).length) names.push(n);
+    const holder = document.createElement('div'); holder.className = 'screens';
+    for (const n of names) {
+      const d = document.createElement('div'); d.className = 'screen'; d.dataset.name = n; d.hidden = true;
+      map.get(n).forEach(k => d.appendChild(k)); holder.appendChild(d);
+    }
+    out.appendChild(holder);
+    $('nav').innerHTML = '<div class="navtitle">' + esc(title) + '</div>' + names.map(n => '<button type="button" class="navbtn" data-screen-go="' + esc(n) + '">' + esc(n) + (badges && badges[n] ? '<span class="badge">' + esc(String(badges[n])) + '</span>' : '') + '</button>').join('');
+    let start = names[0];
+    try { const sv = localStorage.getItem('bimviewer.screen.' + kind); if (sv && names.includes(sv)) start = sv; } catch (e) { /* storage may be unavailable */ }
+    goScreen(start, true);
+  }
+  function goScreen(name, quiet) {
+    document.querySelectorAll('#out .screen').forEach(d => { d.hidden = d.dataset.name !== name; });
+    document.querySelectorAll('#nav .navbtn').forEach(b => {
+      const on = b.dataset.screenGo === name; b.classList.toggle('on', on);
+      if (on) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+    });
+    try { localStorage.setItem('bimviewer.screen.' + currentKind, name); } catch (e) { /* ignore */ }
+    if (viewer && viewer.render) requestAnimationFrame(() => viewer.render());
+    if (!quiet) { const y = $('out').getBoundingClientRect().top + window.scrollY - 12; if (window.scrollY > y) window.scrollTo({ top: y }); }
+  }
+  document.addEventListener('click', e => { const b = e.target.closest('[data-screen-go]'); if (b) goScreen(b.dataset.screenGo); });
 
   let lastIfc = SAMPLE_IFC;
   function renderIfc(r, banner) {
@@ -1816,21 +1903,25 @@ tr.det td { background: var(--bg); }
     ];
     const lenU = (r.units.find(u => u.kind === 'length') || {}).unit;
     if (lenU) facts.push(['Length unit', lenU]);
+    html += '<div data-screen="Overview"></div>';
     html += '<div class="grid2"><section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('ifacts', ['Field', 'Value'], facts) + '</div>';
     html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + (f[1] ? esc(f[1]) : '<span class="cap">not stored</span>') + '</td></tr>').join('') + '</tbody></table></div></section>';
     html += '<section class="card"><div class="head"><h2>Spatial structure</h2>' + copyBtn('ihier', ['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [h.cls, h.name, h.extra, h.count == null ? '' : h.count])) + '</div>';
     html += table(['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [esc(h.cls), esc(h.name), esc(h.extra), h.count == null ? '' : fmtN(h.count)]), { right: [3] });
     html += '<p class="cap">Site, building, level, and the elements placed on each level.</p></section></div>';
 
+    html += '<div data-screen="Model contents"></div>';
     html += '<section class="card"><div class="head"><h2>What is in the model</h2>' + copyBtn('icls', ['Class', 'Count', 'Types', 'Levels'], r.classes.map(c => [c.cls, c.count, c.types, c.levels])) + '</div>';
     html += table(['IFC class', 'Count', 'Distinct types', 'Level'], r.classes.map(c => [esc(c.cls), fmtN(c.count), fmtN(c.types), esc(c.levels)]), { right: [1, 2], mono: [0] });
     html += '</section>';
 
+    html += '<div data-screen="Readiness"></div>';
     html += '<section class="card"><div class="head"><h2>Data readiness by class</h2><p class="sub">The share of elements in each class that carry each kind of data. These are real counts from the model.</p>' +
       copyBtn('iready', ['Class', 'Elements'].concat(PCT_KEYS.map(k => k[1])), r.readiness.map(x => [x.cls, x.n].concat(PCT_KEYS.map(k => x.pct[k[0]])))) + '</div>';
     html += table(['Class', 'Elements'].concat(PCT_KEYS.map(k => k[1])), r.readiness.map(x => [esc(x.cls), fmtN(x.n)].concat(PCT_KEYS.map(k => pctCell(x.pct[k[0]])))), { right: [1], mono: [0] });
     html += '<p class="cap">Has type means the element is linked to a named type. Material and classification mean a material or classification is attached. Fire rating and maker or model look for a filled-in property with those names. Quantities means area, volume or length values exist. A 0% in maker or model on a model like this means the exporter wrote no manufacturer data, which is common, and it is the number that matters most for submittals.</p></section>';
 
+    html += '<div data-screen="Types and materials"></div>';
     html += '<div class="grid2">';
     html += '<section class="card"><div class="head"><h2>Types</h2>' + copyBtn('itypes', ['Class', 'Type name', 'Instances'], r.types.map(x => [x.cls, x.name, x.count])) + '</div>';
     html += table(['Class', 'Type name', 'Used'], r.types.map(x => [esc(x.cls.replace(/Type$/, '')), esc(x.name), fmtN(x.count)]), { right: [2], wrap: [1], mono: [0] });
@@ -1839,10 +1930,12 @@ tr.det td { background: var(--bg); }
     html += r.materials.length ? table(['Material', 'Elements'], r.materials.map(x => [esc(x.name), fmtN(x.elements)]), { right: [1] }) : '<p class="cap">No materials found.</p>';
     html += '</section></div>';
 
+    html += '<div data-screen="Property sets"></div>';
     html += '<section class="card"><div class="head"><h2>Property sets</h2><p class="sub">Named groups of properties attached to elements.</p>' + copyBtn('ipsets', ['Property set', 'Elements', 'Properties'], r.psets.map(x => [x.name, x.elements, x.props.join('; ')])) + '</div>';
     html += table(['Property set', 'Elements', 'Properties inside'], r.psets.map(x => [esc(x.name), fmtN(x.elements), esc(x.props.join(', '))]), { right: [1], mono: [0] });
     html += '</section>';
 
+    html += '<div data-screen="Elements"></div>';
     html += '<section class="card"><div class="head"><h2>Elements</h2><p class="sub">Click a row to see its properties and materials.</p></div>';
     html += '<div class="tools"><label for="eq" class="cap">Filter</label><input id="eq" class="search" type="search" placeholder="Try wall, fire, Level" autocomplete="off"><span class="cap" id="ecount"></span>' +
       '<button class="ghost" type="button" id="ecopy">Copy shown as CSV</button></div><div id="etable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
@@ -1851,11 +1944,13 @@ tr.det td { background: var(--bg); }
       table(['Entity class', 'Count'], r.census.map(x => [esc(x.label), fmtN(x.count)]), { right: [1], mono: [0] }) +
       '<p class="cap" style="margin-top:8px">Most of an IFC is geometry: points, faces and shapes. The building elements above are a small part of it.</p></div></details></section>';
 
+    html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>Geometry as a picture. This reader lists what the model contains but does not draw it yet.</li>' +
       '<li>Elements the exporter left out. An IFC holds only what was exported, so a room can have far more in reality than in its IFC.</li></ul></div>';
 
     $('out').innerHTML = html;
+    layoutScreens('ifc', 'IFC file: ' + (r.fileName || ''), {});
     document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
 
     const els = r.elements;
@@ -2098,6 +2193,7 @@ tr.det td { background: var(--bg); }
       ['Detail', res.step > 1 ? 'Quick, every ' + res.step + 'th point measured (all points counted)' : 'Exact, every point measured'],
       ['Time taken', res.seconds.toFixed(1) + ' s'], ['Other files skipped', fmtN(res.skipped) + (res.skippedBig.length ? ' (including ' + res.skippedBig.length + ' file over 100 MB)' : '')]
     ];
+    html += '<div data-screen="3D view"></div>';
     html += '<section class="card"><div class="head"><h2>3D view</h2><p class="sub">Drag to rotate, scroll to zoom, right-drag or shift-drag to move, click a point to select its object. Shows a sample of the points.</p></div>' +
       '<div class="tools"><label for="vmode" class="cap">Color</label><select id="vmode" class="search" style="width:auto"><option value="1">By class</option><option value="0">True color</option><option value="2">By height</option></select>' +
       '<label for="vsize" class="cap">Point size</label><input id="vsize" type="range" min="1" max="6" step="0.5" value="2" style="width:120px">' +
@@ -2106,8 +2202,9 @@ tr.det td { background: var(--bg); }
       '<button class="ghost" type="button" id="vreset">Reset view</button><button class="ghost" type="button" id="vall">All on</button><button class="ghost" type="button" id="vnone">All off</button><span class="cap" id="vinfo"></span></div>' +
       '<div id="vclasses" class="tools" style="gap:6px 14px"></div>' +
       '<div id="ovbox" style="margin:8px 0"></div>' +
-      '<div class="vwrap"><canvas id="vcanvas" aria-label="3D point cloud of the scanned room"></canvas></div>' +
-      '<div id="vsel" class="selbox" aria-live="polite"></div></section>';
+      '<div class="v2"><div class="vwrap"><canvas id="vcanvas" aria-label="3D point cloud of the scanned room"></canvas></div>' +
+      '<div id="vsel" class="selbox" aria-live="polite"></div></div></section>';
+    html += '<div data-screen="Summary"></div>';
     html += '<div class="grid2"><section class="card"><div class="head"><h2>Scan summary</h2>' + copyBtn('sfacts', ['Field', 'Value'], facts) + '</div>';
     html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + esc(f[1]) + '</td></tr>').join('') + '</tbody></table></div>';
     html += '<p class="cap">Distances are read as meters, which gives believable sizes for chairs and tables.</p></section>';
@@ -2135,6 +2232,7 @@ tr.det td { background: var(--bg); }
     html += table(['Slice', 'Objects', 'Points', 'X range (m)', 'Y range (m)', 'Classes'], S.slices.map(s => [esc(s.slice), fmtN(s.objects), fmtN(s.points), s.ext ? m2(s.ext.min[0]) + ' to ' + m2(s.ext.max[0]) : '', s.ext ? m2(s.ext.min[1]) + ' to ' + m2(s.ext.max[1]) : '', fmtN(s.classes)]), { right: [1, 2, 5] });
     html += '</section>';
 
+    html += '<div data-screen="Classes and model"></div>';
     // classes
     const sliceNames = S.slices.map(s => s.slice);
     html += '<section class="card"><div class="head"><h2>Object classes</h2><p class="sub">One row per class in the folder names. Size is the typical segment, trimmed at 1% and 99% to ignore stray points.</p>' +
@@ -2149,6 +2247,7 @@ tr.det td { background: var(--bg); }
     html += table(['Item', 'Scan segments', 'Scan points', 'IFC elements', 'Reading'], cmp.map(r => [esc(r.cls), r.seg ? fmtN(r.seg) : '', r.pts ? fmtN(r.pts) : '', r.ifc ? fmtN(r.ifc) : '', '<span class="tag">' + esc(r.status) + '</span>']), { right: [1, 2, 3] });
     html += '<p class="cap">Segments are not the same as objects. One real chair can be split into several segments, and the model counts whole elements. Read this table as where each side has coverage, not as an exact tally.</p></section>';
 
+    html += '<div data-screen="Label checks"></div>';
     // QA
     const Q = res.qa, sevTag = v => '<span class="tag" style="' + (v === 'high' ? 'background:#fde2e0;color:#9b1c13' : v === 'med' ? 'background:#fdecc8;color:#7a4b00' : '') + '">' + (v === 'high' ? 'Likely wrong' : v === 'med' ? 'Check' : 'Minor') + '</span>';
     html += '<section class="card"><div class="head"><h2>Label sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor under each object (lowest floor in the scan is ' + m2(Q.floor) + ' m, so pits and platforms are handled). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
@@ -2160,16 +2259,19 @@ tr.det td { background: var(--bg); }
     }
     html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: chairs and tables are table height or lower (their height off the floor is not checked), doors are door-sized, lights sit high up, floors are thin and flat, any item whose size, shape and height match a different class better than its own label (for example a chair-shaped segment labeled window), and any chair far larger or smaller than the other chairs. Pieces that are only a flat surface, or that touch the edge of their slice, are noted as probably cut off or partial. Windows are not checked for height, since floor-to-ceiling glass is normal, and lights, tables, walls and floors are not compared with their peers because their sizes vary.</p></section>';
 
+    html += '<div data-screen="All objects"></div>';
     // objects
     html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements. Click a column heading to sort, again to reverse, and a third time to restore the original order.</p></div>';
     html += '<div class="tools"><label for="oq" class="cap">Filter</label><input id="oq" class="search" type="search" placeholder="Try chair, S2, light" autocomplete="off"><label class="cap" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="oflag"> Flagged only</label><span class="cap" id="ocount"></span><button class="ghost" type="button" id="ocopy">Copy shown as CSV</button></div>';
     html += '<div id="otable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
 
+    html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>True object counts. Each file is one segment, and the class labels come from whoever classified the scan. Some labels look rough: a few wall files are only about 10 cm tall near the ceiling, and a file labeled window is chair-sized.</li>' +
       '<li>Every point. The 3D view shows a thinned sample so that large scans stay smooth.</li></ul></div>';
 
     $('out').innerHTML = html;
+    layoutScreens('scan', 'Scan folder', { 'Label checks': res.qa.flagged.length || '' });
     document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
     startViewer(res);
     const showObj = o => {
@@ -2177,8 +2279,8 @@ tr.det td { background: var(--bg); }
       const gi = viewer.groups.findIndex(b => b.cls === o.cls); if (gi < 0) return;
       const ri = viewer.groups[gi].ranges.findIndex(r => r.obj === o); if (ri < 0) return;
       const cb = document.querySelector('[data-vc="' + o.cls + '"]'); if (cb && !cb.checked) { cb.checked = true; viewer.setVisible(o.cls, true); }
+      goScreen('3D view');
       viewer.select(gi, ri); showSel({ range: viewer.groups[gi].ranges[ri] });
-      $('vcanvas').scrollIntoView({ behavior: 'smooth', block: 'center' });
     };
     if ($('qaflags')) {
       $('qaflags').innerHTML = '<div class="tw"><table><thead><tr><th>Level</th><th>Object</th><th>What looks off</th><th></th></tr></thead><tbody>' +
@@ -2329,8 +2431,8 @@ tr.det td { background: var(--bg); }
 
   const GO_IFC = ' <button class="ghost" type="button" data-go="ifc" style="margin-left:8px;padding:3px 10px">See the IFC example</button>';
   const GO_RVT = ' <button class="ghost" type="button" data-go="rvt" style="margin-left:8px;padding:3px 10px">See the Revit example</button>';
-  function showRvtSample() { render(SAMPLE, 'Example result for <strong>racbasicsampleproject.rvt</strong>, one of Autodesk\'s Revit 2024 sample files. Load your own file above to replace it.' + GO_IFC); }
-  function showIfcSample() { renderIfc(SAMPLE_IFC, 'Example result for <strong>L1_C106_IFC.ifc</strong>, a Revit 2023 export of one classroom. Load your own file above to replace it.' + GO_RVT); }
+  function showRvtSample() { render(SAMPLE, 'Example result for <strong>racbasicsampleproject.rvt</strong>, one of Autodesk\'s Revit 2024 sample files. Open your own file on the left to replace it.' + GO_IFC); }
+  function showIfcSample() { renderIfc(SAMPLE_IFC, 'Example result for <strong>L1_C106_IFC.ifc</strong>, a Revit 2023 export of one classroom. Open your own file on the left to replace it.' + GO_RVT); }
   $('out').addEventListener('click', e => {
     const b = e.target.closest('[data-go]');
     if (b) { if (b.dataset.go === 'ifc') showIfcSample(); else showRvtSample(); return; }
@@ -2340,3 +2442,6 @@ tr.det td { background: var(--bg); }
   showRvtSample();
 })();
 </script>
+
+</body>
+</html>

@@ -7,9 +7,9 @@ const {chromium}=require('playwright');
   if(u.includes('pako_inflate.min.js')) return r.fulfill({path:require.resolve('pako/dist/pako_inflate.min.js'),contentType:'application/javascript'});
   if(u.startsWith('file:')) return r.continue(); return r.abort();});
  await pg.goto('file://'+__dirname+'/../dist/index.html');
- await pg.waitForSelector('#qtable table');
+ await pg.waitForSelector('#qtable table',{state:'attached'});
  await pg.setInputFiles('#dir',(process.env.BIM_SAMPLES||'samples')+'/BIM sample/L1_C106_Slices');
- await pg.waitForSelector('#otable table',{timeout:60000});
+ await pg.waitForSelector('#otable table',{state:'attached',timeout:60000});
  await pg.locator('#vcanvas').scrollIntoViewIfNeeded(); const box=await pg.locator('#vcanvas').boundingBox();
  let found=false;
  for(let y=0.2;y<0.9&&!found;y+=0.05)for(let x=0.2;x<0.85&&!found;x+=0.05){

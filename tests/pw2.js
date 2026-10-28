@@ -6,9 +6,9 @@ const {chromium}=require('playwright');
   if(u.includes('pako_inflate.min.js')) return r.fulfill({path:require.resolve('pako/dist/pako_inflate.min.js'),contentType:'application/javascript'});
   if(u.startsWith('file:')) return r.continue(); return r.abort();});
  await pg.goto('file://'+__dirname+'/../dist/index.html');
- await pg.waitForSelector('#qtable table');
- await pg.click('[data-go=ifc]'); await pg.waitForSelector('#etable table');
- await pg.click('#etable tr.row'); 
+ await pg.waitForSelector('#qtable table',{state:'attached'});
+ await pg.click('[data-go=ifc]'); await pg.waitForSelector('#etable table',{state:'attached'});
+ await pg.click('#nav >> text=Elements'); await pg.click('#etable tr.row');
  console.log('sample ifc rows',await pg.textContent('#ecount'));
  await pg.screenshot({path:'shot_ifc_sample.png',fullPage:true});
  // live load
