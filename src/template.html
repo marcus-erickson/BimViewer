@@ -697,14 +697,14 @@ tr.det td { background: var(--bg); }
 
     // QA
     const Q = res.qa, sevTag = v => '<span class="tag" style="' + (v === 'high' ? 'background:#fde2e0;color:#9b1c13' : v === 'med' ? 'background:#fdecc8;color:#7a4b00' : '') + '">' + (v === 'high' ? 'Likely wrong' : v === 'med' ? 'Check' : 'Minor') + '</span>';
-    html += '<section class="card"><div class="head"><h2>Label sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor (floor taken as ' + m2(Q.floor) + ' m). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
+    html += '<section class="card"><div class="head"><h2>Label sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor under each object (lowest floor in the scan is ' + m2(Q.floor) + ' m, so pits and platforms are handled). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
       copyBtn('sqa', ['Severity', 'Object', 'Slice', 'Class', 'Problem'], Q.flagged.map(o => [Q.flags.get(o)[0].sev, o.name, o.slice, o.cls, Q.flags.get(o).map(x => x.msg).join(' ')])) + '</div>';
     if (!Q.flagged.length) html += '<p>Nothing looks out of place for the rules checked.</p>';
     else {
       html += table(['Rule', 'Level', 'Segments'], Q.rules.map(r => [esc(r.rule), sevTag(r.sev), fmtN(r.n)]), { right: [2] });
       html += '<div id="qaflags" style="margin-top:12px"></div>';
     }
-    html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables are table height or lower (their height off the floor is not checked), doors are door-sized, lights sit near the ceiling, floors are flat, and any segment far larger or smaller than others in its class.</p></section>';
+    html += '<p class="cap">These are rules of thumb, not proof. A flag means the label and the shape disagree and a person should look. Rules: windows start above the floor, chairs and tables are table height or lower (their height off the floor is not checked), doors are door-sized, lights sit near the ceiling, floors are thin and flat, and any segment far larger or smaller than others in its class.</p></section>';
 
     // objects
     html += '<section class="card"><div class="head"><h2>All objects</h2><p class="sub">Click a row for the full measurements. Click a column heading to sort, again to reverse, and a third time to restore the original order.</p></div>';

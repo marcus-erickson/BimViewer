@@ -91,7 +91,7 @@ Treat a low alignment score as a sign to adjust by eye. Auto-align has only been
 
 ### Label sanity checks
 
-The scan card flags segments whose label does not match their shape, using size and height above the floor. Examples: a window that starts on the floor and is chair-sized, a chair taller than 1.5 m (furniture is not checked for height off the floor), a light near the floor, or a segment more than three times the size of its peers. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
+The scan card flags segments whose label does not match their shape, using size and height above the floor under each object, so a room with a pit or raised platform is handled. Examples: a window that starts on the floor and is chair-sized, a chair taller than 1.5 m (furniture is not checked for height off the floor), a light near the floor, or a segment more than three times the size of its peers. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
 
 These are rules of thumb. A flag means the label and the shape disagree, not which one is wrong. The thresholds live in the `RULES` table in `src/scan.js` and are easy to adjust.
 

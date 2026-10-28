@@ -161,19 +161,33 @@
     projector: { bottomMin: 1.4 },
     sign: { bottomMin: 1.2 },
     exit: { bottomMin: 1.2 },
-    floor: { topMax: 0.35 },
+    floor: { hMax: 0.35 },
     ceiling: { bottomMin: 1.8 }
   };
   function qa(objs, room) {
     const fl = objs.filter(o => o.cls === 'floor' && o.points >= 100);
     const floor = fl.length ? Math.min.apply(null, fl.map(o => o.p1[2])) : (room && room.floorZ != null ? room.floorZ : (room && room.shell ? room.shell.min[2] : 0));
     const flags = new Map();
+    // Floor under each object: the highest floor segment that covers its footprint and sits at or below its base.
+    // This keeps pits, platforms and ramps from skewing the height checks.
+    const floors = fl.map(o => ({ x0: o.p1[0] - 0.3, x1: o.p99[0] + 0.3, y0: o.p1[1] - 0.3, y1: o.p99[1] + 0.3, z: o.mean[2] }));
+    const floorUnder = o => {
+      if (!floors.length) return floor;
+      let best = null;
+      for (const f of floors) {
+        if (o.mean[0] < f.x0 || o.mean[0] > f.x1 || o.mean[1] < f.y0 || o.mean[1] > f.y1) continue;
+        if (f.z > o.p1[2] + 0.3) continue;
+        if (best === null || f.z > best) best = f.z;
+      }
+      return best === null ? floor : best;
+    };
     const add = (o, rule, sev, msg) => { let a = flags.get(o); if (!a) flags.set(o, a = []); a.push({ rule, sev, msg }); };
     const byCls = new Map();
     for (const o of objs) { let a = byCls.get(o.cls); if (!a) byCls.set(o.cls, a = []); a.push(o); }
     const f1 = v => (Math.round(v * 100) / 100).toFixed(2);
     for (const o of objs) {
-      const bottom = o.p1[2] - floor, top = o.p99[2] - floor, h = o.size[2], dim = Math.max(o.size[0], o.size[1]);
+      const fz = o.cls === 'floor' ? floor : floorUnder(o);
+      const bottom = o.p1[2] - fz, top = o.p99[2] - fz, h = o.size[2], dim = Math.max(o.size[0], o.size[1]);
       const r = RULES[o.cls];
       if (o.points < 100) add(o, 'Very few points', 'low', 'Only ' + o.points + ' points, too few to judge.');
       if (r) {
