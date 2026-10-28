@@ -152,7 +152,7 @@
 
   /* QA: flag segments whose size or height does not fit their class label. Heights are relative to the floor. */
   const RULES = {
-    window: { bottomMin: 0.3, note: 'Windows normally start well above the floor' },
+    window: {},
     chair: { hMin: 0.3, hMax: 1.5, dimMax: 1.2 },
     table: { hMin: 0.4, hMax: 1.4 },
     desk: { hMin: 0.4, hMax: 1.4 },
@@ -165,6 +165,9 @@
     ceiling: { bottomMin: 1.8 }
   };
   function qa(objs, room) {
+    const sliceX = new Map();
+    for (const o of objs) { const e = sliceX.get(o.slice) || [Infinity, -Infinity]; e[0] = Math.min(e[0], o.p1[0]); e[1] = Math.max(e[1], o.p99[0]); sliceX.set(o.slice, e); }
+    const atEdge = o => { const e = sliceX.get(o.slice); return !!e && (o.p1[0] <= e[0] + 0.15 || o.p99[0] >= e[1] - 0.15); };
     const fl = objs.filter(o => o.cls === 'floor' && o.points >= 100);
     const floor = fl.length ? Math.min.apply(null, fl.map(o => o.p1[2])) : (room && room.floorZ != null ? room.floorZ : (room && room.shell ? room.shell.min[2] : 0));
     const flags = new Map();
@@ -194,15 +197,19 @@
         if (r.bottomMin != null && bottom < r.bottomMin) add(o, 'Too low for its class', 'high', 'Starts ' + f1(bottom) + ' m above the floor; a ' + o.cls + ' normally starts above ' + f1(r.bottomMin) + ' m.');
         if (r.bottomMax != null && bottom > r.bottomMax) add(o, 'Floating', 'med', 'Starts ' + f1(bottom) + ' m above the floor; a ' + o.cls + ' normally rests near it.');
         if (r.topMax != null && top > r.topMax) add(o, 'Too high for its class', 'high', 'Top is ' + f1(top) + ' m above the floor; a ' + o.cls + ' should be flat near it.');
-        if (r.hMin != null && h < r.hMin) add(o, 'Too short for its class', 'med', 'Height is ' + f1(h) + ' m; a ' + o.cls + ' is normally at least ' + f1(r.hMin) + ' m.');
+        if (r.hMin != null && h < r.hMin) {
+          if (h < 0.06 && dim >= 0.3) add(o, 'Flat surface only', 'low', 'Only a flat surface, ' + f1(h) + ' m thick and ' + f1(dim) + ' m across. Probably just the top of a ' + o.cls + ' with its legs or base missing or in another segment.');
+          else if (atEdge(o)) add(o, 'Cut at slice edge', 'low', 'Height is ' + f1(h) + ' m and it touches the edge of slice ' + o.slice + ', so it is probably a piece of a larger ' + o.cls + ' that was cut by the slice boundary.');
+          else add(o, 'Too short for its class', 'med', 'Height is ' + f1(h) + ' m; a ' + o.cls + ' is normally at least ' + f1(r.hMin) + ' m.');
+        }
         if (r.hMax != null && h > r.hMax) add(o, 'Too tall for its class', 'med', 'Height is ' + f1(h) + ' m; a ' + o.cls + ' is normally under ' + f1(r.hMax) + ' m.');
         if (r.dimMax != null && dim > r.dimMax) add(o, 'Too wide for its class', 'med', 'Footprint is ' + f1(dim) + ' m across; a ' + o.cls + ' is normally under ' + f1(r.dimMax) + ' m.');
       }
       if (o.cls === 'window' && dim < 0.9 && h < 1.0 && bottom < 0.4) add(o, 'Looks like furniture', 'high', 'Small, low and near the floor (' + f1(dim) + ' m wide, ' + f1(h) + ' m tall). Possibly a chair or table labeled as a window.');
-      if (o.cls === 'wall' && h < 0.3 && dim < 1.0) add(o, 'Sliver wall', 'low', 'A wall segment only ' + f1(h) + ' m tall and ' + f1(dim) + ' m wide.');
+      if (o.cls === 'wall' && h < 0.3 && dim < 1.0) add(o, 'Sliver wall', 'low', 'A wall segment only ' + f1(h) + ' m tall and ' + f1(dim) + ' m wide' + (room && room.ceilZ != null && o.p1[2] > room.ceilZ - 0.3 ? ', up at ceiling height, so it may be part of the ceiling or a soffit.' : '.'));
     }
     for (const [cls, list] of byCls) {
-      if (list.length < 4 || cls === 'wall' || cls === 'floor' || cls === 'ceiling') continue; // shell pieces vary widely in length
+      if (list.length < 4 || cls !== 'chair') continue; // other classes mix sizes (strip and spot lights, round and long tables, shell pieces)
       const md = median(list.map(o => Math.max(o.size[0], o.size[1], o.size[2])));
       if (!(md > 0.05)) continue;
       for (const o of list) {
@@ -233,7 +240,7 @@
     const shapeCls = Array.from(byCls.keys()).filter(c => !SKIP.has(c) && (byCls.get(c) || []).filter(o => fmap.has(o)).length >= 4);
     const typical = pr => 'typical ' + '' + [Math.exp(pr.med[0]) - 0.05, Math.exp(pr.med[1]) - 0.05, Math.exp(pr.med[2]) - 0.05].map(v => f1(Math.max(0, v))).join(' x ') + ' m';
     for (const o of objs) {
-      const f = fmap.get(o); if (!f) continue;
+      const f = fmap.get(o); if (!f || atEdge(o)) continue;
       const own = profile(o.cls, o); if (!own) continue;
       const dOwn = dist(f, own);
       if (dOwn < 12) continue;
