@@ -153,9 +153,9 @@
   /* QA: flag segments whose size or height does not fit their class label. Heights are relative to the floor. */
   const RULES = {
     window: { bottomMin: 0.3, note: 'Windows normally start well above the floor' },
-    chair: { hMin: 0.3, hMax: 1.5, dimMax: 1.2, bottomMax: 0.4 },
-    table: { hMin: 0.4, hMax: 1.4, bottomMax: 0.4 },
-    desk: { hMin: 0.4, hMax: 1.4, bottomMax: 0.4 },
+    chair: { hMin: 0.3, hMax: 1.5, dimMax: 1.2 },
+    table: { hMin: 0.4, hMax: 1.4 },
+    desk: { hMin: 0.4, hMax: 1.4 },
     door: { hMin: 1.5, hMax: 2.8, bottomMax: 0.4, dimMax: 3 },
     light: { bottomMin: 1.4 },
     projector: { bottomMin: 1.4 },
