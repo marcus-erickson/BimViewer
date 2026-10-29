@@ -137,6 +137,12 @@ header.loaded .openrow { margin-top: 10px; }
 .screen[hidden] { display: none; }
 .v2 { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
 .v2 .selbox { margin-top: 0; }
+.chatlog { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; max-height: 55vh; overflow-y: auto; }
+.cb { padding: 8px 12px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 90ch; }
+.cb.me { align-self: flex-end; background: var(--accent-soft); }
+.cb.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--rule); }
+.chatdigest { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-data); font-size: 0.8rem; background: var(--bg); border: 1px solid var(--rule); border-radius: 4px; padding: 8px; max-height: 260px; overflow: auto; margin-top: 8px; }
+[data-chat-q] { text-align: left; }
 .v2:has(.selbox[hidden]) { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 1150px) { .v2 { grid-template-columns: minmax(0, 1fr); } .v2 .selbox { margin-top: 10px; } }
 @media (max-width: 900px) {
@@ -166,7 +172,7 @@ tr.det td { background: var(--bg); }
 <div class="wrap">
   <header>
     <h1>BIM File Viewer</h1>
-    <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files never leave your computer.</p>
+    <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files are never uploaded. The optional Ask Claude screen sends a short summary only when you ask a question.</p>
   <div class="loadedline" id="loadedline" hidden></div>
   <div class="openrow" id="openrow">
   <div class="drop" id="drop">
@@ -387,6 +393,7 @@ tr.det td { background: var(--bg); }
       '<select id="kind" class="search" style="max-width:190px"><option value="">All kinds</option></select><span class="cap" id="qcount"></span><button class="ghost" type="button" id="qcopy">Copy shown as CSV</button></div>';
     html += '<div id="qtable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
 
+    html += '<div data-screen="Ask Claude"></div>' + chatSection('revit');
     html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>Counts of walls, doors, ducts or any other element. Revit keeps those in a binary model format that only Revit itself, or Autodesk\'s cloud tools, can read completely.</li>' +
@@ -395,7 +402,9 @@ tr.det td { background: var(--bg); }
       'To get element-level data, export the model to IFC from Revit or Autodesk\'s tools and load that file into a reader built for it.</div>';
 
     $('out').innerHTML = html;
+    chatCtx = { digest: () => digestRevit(vm), tools: [] };
     layoutScreens('revit', 'Revit file: ' + (vm.fileName || ''), {});
+    wireChat();
     wire(vm);
   }
 
@@ -405,9 +414,9 @@ tr.det td { background: var(--bg); }
 
 
   const SCREEN_ORDER = {
-    revit: ['Overview', 'Readiness', 'Inside the file', 'Names and units', 'Text and links', 'Limits'],
-    ifc: ['Overview', 'Model contents', 'Readiness', 'Types and materials', 'Property sets', 'Elements', 'Limits'],
-    scan: ['3D view', 'Summary', 'Classes and model', 'Sanity checks', 'All objects', 'Limits']
+    revit: ['Overview', 'Readiness', 'Inside the file', 'Names and units', 'Text and links', 'Ask Claude', 'Limits'],
+    ifc: ['Overview', 'Model contents', 'Readiness', 'Types and materials', 'Property sets', 'Elements', 'Ask Claude', 'Limits'],
+    scan: ['3D view', 'Summary', 'Classes and model', 'Sanity checks', 'All objects', 'Ask Claude', 'Limits']
   };
   let currentKind = 'revit';
   function layoutScreens(kind, title, badges) {
@@ -445,6 +454,129 @@ tr.det td { background: var(--bg); }
     if (!quiet) { const y = $('out').getBoundingClientRect().top + window.scrollY - 12; if (window.scrollY > y) window.scrollTo({ top: y }); }
   }
   document.addEventListener('click', e => { const b = e.target.closest('[data-screen-go]'); if (b) goScreen(b.dataset.screenGo); });
+
+  // ---- Ask Claude: a chat about the loaded file, answered from a short digest plus search tools that run on the real data ----
+  const CHAT_RULES = 'You are helping someone explore a building-model file they opened in a viewer. Answer only from the digest below and from the search tools. ' +
+    'Never estimate a count or a size you were not given; use a tool or say which screen of the viewer shows it. Write plainly for a construction professional, in short paragraphs, ' +
+    'with a list only when comparing several items. Do not use em dashes. Lengths in the scan are meters. If a question needs data you do not have, say so in one sentence.';
+  const CHAT_STARTERS = {
+    revit: ['Is this file ready for a submittal register? What is the biggest gap?', 'What does the project information tell me about this model?', 'Explain what I can and cannot learn from an .rvt file.'],
+    ifc: ['Which classes are missing material or type data?', 'How ready is this model for a submittal register?', 'List the element classes and what each one is.', 'Which doors have no fire rating?'],
+    scan: ['Which flags should I look at first, and why?', 'Summarize this scan in a few sentences.', 'Which chairs look wrong?', 'How tall is the room and how big is the footprint?']
+  };
+  let chatCtx = null, chatTurns = [], chatCtl = null;
+  const fx = (n, d) => n == null || !isFinite(n) ? '' : (+n).toFixed(d == null ? 2 : d);
+  function digestRevit(vm) {
+    const info = vm.info || {}, L = [];
+    L.push('FILE KIND: Revit project file (.rvt). Name: ' + vm.fileName + ', ' + fmtBytes(vm.fileSize) + '. Element data cannot be read from .rvt, so counts below are mentions of names in the file text, not placed elements.');
+    L.push('Revit format: ' + (info.Format || info.__version || '') + '; build ' + (info.__build || '') + '; worksharing: ' + (info.Worksharing || 'not stored'));
+    L.push('PROJECT INFORMATION: ' + (vm.project.fields || []).map(f => f.name + '=' + f.value).join('; '));
+    if (vm.readiness) L.push('SUBMITTAL READINESS (' + vm.readiness.found + ' of ' + vm.readiness.total + ' fields seen in file text): ' + vm.readiness.items.map(i => i.name + ' ' + (i.seen ? 'seen x' + i.mentions : 'not seen')).join('; '));
+    const kinds = {};
+    for (const s of vm.strings) { const k = kindOf(s[0]); (kinds[k] = kinds[k] || []).push(s[0]); }
+    L.push('NAMES FOUND BY KIND: ' + Object.keys(kinds).sort().map(k => k + ' (' + kinds[k].length + '): ' + kinds[k].slice(0, 12).join(', ')).join(' | '));
+    return L.join('\n');
+  }
+  function digestIfc(r) {
+    const h = r.header || {}, L = [];
+    L.push('FILE KIND: IFC model. Name: ' + r.fileName + ', ' + fmtBytes(r.fileSize) + '. Schema ' + h.schema + '. Exported from ' + r.app + '. Project: ' + ((r.project && r.project.name) || '') + '.');
+    L.push('Entities: ' + r.totals.entities + '; products: ' + r.totals.elements);
+    L.push('SPATIAL STRUCTURE: ' + r.hierarchy.map(x => x.cls + ' ' + x.name + (x.count != null ? ' (' + x.count + ' elements)' : '')).join('; '));
+    L.push('CLASSES (class, count, distinct types, level): ' + r.classes.slice(0, 40).map(c => c.cls + ',' + c.count + ',' + c.types + ',' + c.levels).join(' | '));
+    L.push('READINESS, percent of elements per class that have: ' + PCT_KEYS.map(k => k[1]).join(', ') + ' || ' + r.readiness.slice(0, 40).map(x => x.cls + ' n=' + x.n + ' ' + PCT_KEYS.map(k => x.pct[k[0]] + '%').join('/')).join(' | '));
+    L.push('TYPES (top 30): ' + r.types.slice(0, 30).map(x => x.name + ' x' + x.count).join('; '));
+    L.push('MATERIALS (top 20): ' + r.materials.slice(0, 20).map(x => x.name + ' x' + x.elements).join('; '));
+    L.push('PROPERTY SETS (top 20): ' + r.psets.slice(0, 20).map(x => x.name + ' x' + x.elements).join('; '));
+    return L.join('\n');
+  }
+  function digestScan(res) {
+    const S = res.summary, Q = res.qa, R = S.room, L = [];
+    L.push('FILE KIND: classified point-cloud scan folder. ' + res.objs.length + ' objects (one file each) in ' + S.slices.length + ' slices; distances in meters. Class labels come from whoever classified the scan and can be wrong.');
+    L.push('ROOM: floor z ' + fx(R.floorZ) + ', ceiling z ' + fx(R.ceilZ) + ', height ' + fx(R.height) + (R.shell ? ', extent X ' + fx(R.shell.max[0] - R.shell.min[0]) + ' by Y ' + fx(R.shell.max[1] - R.shell.min[1]) : '') + '. Lowest floor in the scan z ' + fx(Q.floor) + ' (the room has a pit).');
+    L.push('CLASSES (class, segments, median size XxYxZ, z range): ' + S.classes.map(c => c.cls + ',' + c.segments + ',' + c.medSize.map(v => fx(v)).join('x') + ',' + fx(c.zMin) + ' to ' + fx(c.zMax)).join(' | '));
+    const fl = Q.flagged.slice(0, 30);
+    L.push('SANITY CHECK FLAGS (' + Q.flagged.length + ' of ' + Q.total + ' segments' + (Q.flagged.length > 30 ? ', first 30 shown' : '') + '; severity high=Likely wrong, med=Check, low=Minor): ' + (fl.map(o => Q.flags.get(o)[0].sev + ' ' + o.name + ' (' + o.slice + ') ' + Q.flags.get(o).map(x => x.msg).join(' ')).join(' | ') || 'none'));
+    if (window.__selObj) { const o = window.__selObj; L.push('SELECTED OBJECT: ' + o.name + ', slice ' + o.slice + ', class ' + o.cls + ', ' + o.points + ' points, size ' + o.size.map(v => fx(v)).join(' x ') + ' m, z ' + fx(o.p1[2]) + ' to ' + fx(o.p99[2])); }
+    return L.join('\n');
+  }
+  function chatToolsFor(kind, data) {
+    const cap = (arr, n) => ({ total: arr.length, shown: Math.min(n, arr.length), rows: arr.slice(0, n) });
+    if (kind === 'ifc') return [{
+      name: 'find_elements', description: 'Search the IFC elements. Returns the total number of matches and up to 25 rows (class, name, type, level, materials). Use for any question that needs a list or a count of elements.',
+      inputSchema: { type: 'object', properties: { cls: { type: 'string', description: 'IFC class such as IfcDoor, case-insensitive substring' }, level: { type: 'string' }, name_contains: { type: 'string' }, missing: { type: 'string', enum: ['type', 'material', 'fire_rating'], description: 'only elements lacking this' } } },
+      execute: a => {
+        const c = String(a.cls || '').toLowerCase(), lv = String(a.level || '').toLowerCase(), nm = String(a.name_contains || '').toLowerCase();
+        const hasFire = el => el.psets.some(p => p.props.some(q => /fire/i.test(q.name) && q.value != null && String(q.value).trim() !== ''));
+        const m = data.elements.filter(el => (!c || el.cls.toLowerCase().includes(c)) && (!lv || String(el.level).toLowerCase().includes(lv)) && (!nm || String(el.name).toLowerCase().includes(nm)) &&
+          (a.missing !== 'type' || !el.typeName) && (a.missing !== 'material' || !el.materials.length) && (a.missing !== 'fire_rating' || !hasFire(el)));
+        return cap(m.map(el => ({ cls: el.cls, name: el.name, type: el.typeName || '', level: el.level, materials: el.materials.join(', ') })), 25);
+      }
+    }];
+    if (kind === 'scan') return [{
+      name: 'find_objects', description: 'Search the scan objects. Returns the total number of matches and up to 25 rows (name, class, slice, size X Y Z in meters, z low and high, flag text). Use for any question that needs a list or a count of objects.',
+      inputSchema: { type: 'object', properties: { cls: { type: 'string', description: 'class label such as chair, exact' }, slice: { type: 'string', description: 'for example S2' }, flagged_only: { type: 'boolean' }, min_height: { type: 'number', description: 'size Z at least, meters' }, max_height: { type: 'number', description: 'size Z at most, meters' }, min_longest: { type: 'number', description: 'longest side at least, meters' } } },
+      execute: a => {
+        const Q = data.qa, m = data.objs.filter(o => (!a.cls || o.cls === String(a.cls).toLowerCase()) && (!a.slice || o.slice === String(a.slice)) && (!a.flagged_only || Q.flags.has(o)) &&
+          (a.min_height == null || o.size[2] >= +a.min_height) && (a.max_height == null || o.size[2] <= +a.max_height) && (a.min_longest == null || Math.max.apply(null, o.size) >= +a.min_longest));
+        return cap(m.map(o => ({ name: o.name, cls: o.cls, slice: o.slice, size: o.size.map(v => +fx(v)), z: [+fx(o.p1[2]), +fx(o.p99[2])], flag: Q.flags.has(o) ? Q.flags.get(o).map(x => x.msg).join(' ') : '' })), 25);
+      }
+    }];
+    return [];
+  }
+  function chatSection(kind) {
+    const chips = (CHAT_STARTERS[kind] || []).map(q => '<button type="button" class="ghost" data-chat-q="' + esc(q) + '">' + esc(q) + '</button>').join('');
+    return '<section class="card" id="chatcard"><div class="head"><h2>Ask Claude about this file</h2><p class="sub">Answers come from a short summary of what you loaded, plus searches that run on the real data in this page. It uses your own Claude account.</p></div>' +
+      '<div id="chatoff" class="cap" hidden>This copy of the page cannot reach Claude. Open the published version to use chat.</div>' +
+      '<div id="chatbody"><div class="tools" id="chatchips" style="gap:8px">' + chips + '</div>' +
+      '<div id="chatlog" class="chatlog" aria-live="polite"></div>' +
+      '<div class="tools" style="margin-top:10px;align-items:flex-start"><textarea id="chatin" class="search" rows="2" style="flex:1 1 320px" placeholder="Ask a question about this file" aria-label="Question"></textarea>' +
+      '<button type="button" id="chatsend">Ask</button><button type="button" class="ghost" id="chatstop" hidden>Stop</button><button type="button" class="ghost" id="chatclear">Clear</button></div>' +
+      '<details style="margin-top:10px"><summary>What gets sent to Claude</summary><p class="cap">Only this summary and your questions, plus the rows a search returns when Claude asks for them. No point data, no geometry, no file contents beyond what is listed here.</p>' +
+      '<label class="cap" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="chaton" checked> Chat enabled</label><pre id="chatdigest" class="chatdigest"></pre></details></div></section>';
+  }
+  async function wireChat() {
+    if (!chatCtx) return;
+    const card = $('chatcard'); if (!card) return;
+    chatTurns = []; if (chatCtl) { try { chatCtl.abort(); } catch (e) { /* ignore */ } }
+    let enabled = true; try { enabled = localStorage.getItem('bimviewer.chat') !== 'off'; } catch (e) { /* ignore */ }
+    $('chaton').checked = enabled;
+    const refresh = () => { $('chatdigest').textContent = chatCtx.digest(); };
+    refresh();
+    $('chaton').addEventListener('change', () => { try { localStorage.setItem('bimviewer.chat', $('chaton').checked ? 'on' : 'off'); } catch (e) { /* ignore */ } applyOn(); });
+    const applyOn = () => { const on = $('chaton').checked; $('chatin').disabled = !on; $('chatsend').disabled = !on; document.querySelectorAll('[data-chat-q]').forEach(b => { b.disabled = !on; }); };
+    applyOn();
+    let sample = null;
+    try { sample = window.claude && window.claude.use ? await window.claude.use('sample') : null; } catch (e) { sample = null; }
+    if (!sample) { $('chatoff').hidden = false; $('chatbody').querySelectorAll('button,textarea').forEach(b => { b.disabled = true; }); return; }
+    let canTools = false; try { canTools = !!((await sample.limits()).tools); } catch (e) { /* no tools */ }
+    const log = $('chatlog');
+    const bubble = (who, text) => { const d = document.createElement('div'); d.className = 'cb ' + who; d.textContent = text; log.appendChild(d); log.scrollTop = log.scrollHeight; return d; };
+    async function ask(q) {
+      q = (q || '').trim(); if (!q || chatCtl) return;
+      bubble('me', q); const out = bubble('ai', 'Thinking...'); $('chatin').value = '';
+      chatTurns.push({ role: 'user', content: q });
+      chatCtl = new AbortController(); $('chatsend').disabled = true; $('chatstop').hidden = false;
+      const hist = chatTurns.slice(-13);
+      const input = [{ role: 'user', content: CHAT_RULES + '\n\nDIGEST OF THE LOADED FILE:\n' + chatCtx.digest() }].concat(hist);
+      try {
+        const opts = { cache: false, signal: chatCtl.signal, onText: ({ text }) => { out.textContent = text; log.scrollTop = log.scrollHeight; } };
+        if (canTools && chatCtx.tools.length) { opts.tools = chatCtx.tools; delete opts.cache; opts.cache = false; }
+        const res = await sample(input, opts);
+        out.textContent = res.text + (res.truncated ? '\n\n(Cut short. Ask for less at a time.)' : '');
+        chatTurns.push({ role: 'assistant', content: res.text });
+      } catch (e) {
+        chatTurns.pop();
+        const msg = { not_granted: 'Claude was not allowed for this page.', rate_limited: 'Too many requests or a usage limit. Try again later.', session_expired: 'Sign in again to use chat.', cancelled: 'Stopped.', prompt_too_large: 'That was too large to send.' }[e && e.code] || 'Something went wrong. Try again.';
+        out.textContent = (e && e.text ? e.text + '\n\n' : '') + msg;
+      } finally { chatCtl = null; $('chatstop').hidden = true; applyOn(); }
+    }
+    $('chatsend').addEventListener('click', () => ask($('chatin').value));
+    $('chatin').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask($('chatin').value); } });
+    $('chatstop').addEventListener('click', () => { if (chatCtl) chatCtl.abort(); });
+    $('chatclear').addEventListener('click', () => { chatTurns = []; log.innerHTML = ''; });
+    document.querySelectorAll('[data-chat-q]').forEach(b => b.addEventListener('click', () => ask(b.dataset.chatQ)));
+    document.addEventListener('click', e => { if (e.target.closest('[data-screen-go="Ask Claude"]')) refresh(); });
+  }
 
   let lastIfc = SAMPLE_IFC;
   function renderIfc(r, banner) {
@@ -503,13 +635,16 @@ tr.det td { background: var(--bg); }
       table(['Entity class', 'Count'], r.census.map(x => [esc(x.label), fmtN(x.count)]), { right: [1], mono: [0] }) +
       '<p class="cap" style="margin-top:8px">Most of an IFC is geometry: points, faces and shapes. The building elements above are a small part of it.</p></div></details></section>';
 
+    html += '<div data-screen="Ask Claude"></div>' + chatSection('ifc');
     html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>Geometry as a picture. This reader lists what the model contains but does not draw it yet.</li>' +
       '<li>Elements the exporter left out. An IFC holds only what was exported, so a room can have far more in reality than in its IFC.</li></ul></div>';
 
     $('out').innerHTML = html;
+    chatCtx = { digest: () => digestIfc(r), tools: chatToolsFor('ifc', r) };
     layoutScreens('ifc', 'IFC file: ' + (r.fileName || ''), {});
+    wireChat();
     document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
 
     const els = r.elements;
@@ -592,9 +727,9 @@ tr.det td { background: var(--bg); }
 
   function showSel(p) {
     const box = $('vsel');
-    if (!p) { box.innerHTML = ''; box.hidden = true; return; }
+    if (!p) { box.innerHTML = ''; box.hidden = true; window.__selObj = null; return; }
     box.hidden = false;
-    const o = p.range.obj;
+    const o = p.range.obj; window.__selObj = o;
     box.innerHTML = '<div class="head" style="margin-bottom:6px"><h3 style="margin:0;font-size:1rem">' + swatch(o.rgb) + esc(o.name) + ' <span class="tag">' + esc(o.slice) + '</span></h3><button class="ghost" type="button" id="vclear">Clear selection</button></div>' +
       '<div class="kvs"><span>Class</span><span>' + esc(o.cls) + '</span><span>Points</span><span>' + fmtN(o.points) + '</span>' +
       '<span>Size X × Y × Z</span><span class="mono">' + size3(o.size) + ' m (' + feet3(o.size) + ' ft)</span>' +
@@ -825,13 +960,17 @@ tr.det td { background: var(--bg); }
     html += '<div class="tools"><label for="oq" class="cap">Filter</label><input id="oq" class="search" type="search" placeholder="Try chair, S2, light" autocomplete="off"><label class="cap" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="oflag"> Flagged only</label><span class="cap" id="ocount"></span><button class="ghost" type="button" id="ocopy">Copy shown as CSV</button></div>';
     html += '<div id="otable"></div><textarea id="csvfall" class="csvbox" hidden readonly aria-label="CSV text"></textarea></section>';
 
+    html += '<div data-screen="Ask Claude"></div>' + chatSection('scan');
     html += '<div data-screen="Limits"></div>';
     html += '<div class="note"><strong>What this does not show.</strong><ul>' +
       '<li>True object counts. Each file is one segment, and the class labels come from whoever classified the scan. Some labels look rough: a few wall files are only about 10 cm tall near the ceiling, and a file labeled window is chair-sized.</li>' +
       '<li>Every point. The 3D view shows a thinned sample so that large scans stay smooth.</li></ul></div>';
 
     $('out').innerHTML = html;
+    window.__selObj = null;
+    chatCtx = { digest: () => digestScan(res), tools: chatToolsFor('scan', res) };
     layoutScreens('scan', 'Scan folder', { 'Sanity checks': res.qa.flagged.length || '' });
+    wireChat();
     document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
     startViewer(res);
     const showObj = o => {

@@ -26,9 +26,9 @@ The page opens with two buttons under the title: one for a Revit or IFC file, on
 
 | File type | Screens |
 |---|---|
-| Revit | Overview, Readiness, Inside the file, Names and units, Text and links, Limits |
-| IFC | Overview, Model contents, Readiness, Types and materials, Property sets, Elements, Limits |
-| Scan folder | 3D view, Summary, Classes and model, Sanity checks (with a count of flags), All objects, Limits |
+| Revit | Overview, Readiness, Inside the file, Names and units, Text and links, Ask Claude, Limits |
+| IFC | Overview, Model contents, Readiness, Types and materials, Property sets, Elements, Ask Claude, Limits |
+| Scan folder | 3D view, Summary, Classes and model, Sanity checks (with a count of flags), All objects, Ask Claude, Limits |
 
 ### Revit files
 
@@ -83,6 +83,12 @@ You get:
 - **Fill gaps** draws each point as a disc that grows as you zoom in, so surfaces look more solid. **Shading** gives each disc a lit, rounded look. Both change only how points are drawn, not the data, and measurements always use the real points.
 
 ![Scan with IFC outline](docs/img/scan-ifc-overlay.png)
+
+### Ask Claude (chat)
+
+The **Ask Claude** screen lets you ask questions about whatever is loaded, such as "which classes are missing material data?" or "which chairs look wrong?". Claude sees a short text summary of the file (file facts, class counts, readiness percentages, the Sanity check flags and the selected object) and can run two searches on the real data in the page, `find_elements` for IFC and `find_objects` for scans, so counts and lists come from the file and not from a guess. Open **What gets sent to Claude** on that screen to see the exact summary. No point data, geometry or raw file contents are sent. The **Chat enabled** box turns it off.
+
+Chat only works in the version published as a Claude artifact, because it uses the viewer's own Claude account through the artifact `sample` capability. In a standalone copy of `dist/index.html` the screen says it cannot reach Claude. A typical question sends roughly 1,000 to 4,000 tokens.
 
 ### IFC overlay
 
@@ -151,6 +157,7 @@ node tests/tifc.js          # IFC audit on the sample IFC
 node tests/tqa.js           # scan measurements and QA flags
 node tests/pw_layout.js     # browser test: left menu and screens for Revit, IFC and scan, desktop and phone
 node tests/pw8.js           # browser test: load a scan folder, QA list, Show in 3D, phone width
+node tests/pw_chat.js       # browser test: Ask Claude screen with a fake Claude
 node tests/pw5.js           # browser test: click to select and the IFC overlay
 node tools/mksample.js      # regenerate data/sample.json from a Revit file
 node tools/mkifc.js         # regenerate data/sample_ifc.json from the IFC
