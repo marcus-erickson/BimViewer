@@ -7,7 +7,7 @@ require('../src/rvt.js'); require('../src/ifc.js');
 (async () => {
   const file = process.argv[2], out = process.argv[3] || 'snapshot.json';
   if (!file) { console.error('usage: node tools/snapshot.js <file.rvt|file.ifc> [out.json]'); process.exit(2); }
-  const name = path.basename(file), size = fs.statSync(file).size, ext = path.extname(file).toLowerCase();
+  const name = path.basename(file).replace(/^[0-9a-f]{8}-/i, ''), size = fs.statSync(file).size, ext = path.extname(file).toLowerCase();
   let snap;
   if (ext === '.ifc') {
     const r = IFC.readIfc(fs.readFileSync(file, 'utf8')); r.fileName = name; r.fileSize = size;

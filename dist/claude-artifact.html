@@ -80,6 +80,7 @@ section.card { background: var(--surface); border: 1px solid var(--rule); border
 .head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; }
 .head .sub { color: var(--muted); font-size: 0.9rem; flex: 1 1 260px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+.grid2.stack { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
 
 .tw { overflow-x: auto; border: 1px solid var(--rule); border-radius: 4px; max-height: 420px; overflow-y: auto; }
@@ -120,6 +121,8 @@ details summary { cursor: pointer; font-weight: 500; }
 .openrow .progress { width: 220px; }
 header .lede { max-width: none; }
 header.loaded .openrow { margin-top: 10px; }
+header.snap .lede { display: none; }
+header.snap .loadedline { display: none; }
 .loadedline { display: flex; flex-wrap: wrap; gap: 6px 32px; margin-top: 12px; }
 .li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
 .lk { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -171,7 +174,7 @@ tr.det td { background: var(--bg); }
 
 <div class="wrap">
   <header>
-    <h1>BIM File Viewer</h1>
+    <h1 id="pagetitle">BIM File Viewer</h1>
     <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files are never uploaded. The optional Ask Claude screen sends a short summary only when you ask a question.</p>
   <div class="loadedline" id="loadedline" hidden></div>
   <div class="openrow" id="openrow">
@@ -2050,7 +2053,7 @@ tr.det td { background: var(--bg); }
     const lenU = (r.units.find(u => u.kind === 'length') || {}).unit;
     if (lenU) facts.push(['Length unit', lenU]);
     html += '<div data-screen="Overview"></div>';
-    html += '<div class="grid2"><section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('ifacts', ['Field', 'Value'], facts) + '</div>';
+    html += '<div class="grid2 stack"><section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('ifacts', ['Field', 'Value'], facts) + '</div>';
     html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + (f[1] ? esc(f[1]) : '<span class="cap">not stored</span>') + '</td></tr>').join('') + '</tbody></table></div></section>';
     html += '<section class="card"><div class="head"><h2>Spatial structure</h2>' + copyBtn('ihier', ['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [h.cls, h.name, h.extra, h.count == null ? '' : h.count])) + '</div>';
     html += table(['Kind', 'Name', 'Detail', 'Elements'], r.hierarchy.map(h => [esc(h.cls), esc(h.name), esc(h.extra), h.count == null ? '' : fmtN(h.count)]), { right: [3] });
@@ -2068,7 +2071,7 @@ tr.det td { background: var(--bg); }
     html += '<p class="cap">Has type means the element is linked to a named type. Material and classification mean a material or classification is attached. Fire rating and maker or model look for a filled-in property with those names. Quantities means area, volume or length values exist. A 0% in maker or model on a model like this means the exporter wrote no manufacturer data, which is common, and it is the number that matters most for submittals.</p></section>';
 
     html += '<div data-screen="Types and materials"></div>';
-    html += '<div class="grid2">';
+    html += '<div class="grid2 stack">';
     html += '<section class="card"><div class="head"><h2>Types</h2>' + copyBtn('itypes', ['Class', 'Type name', 'Instances'], r.types.map(x => [x.cls, x.name, x.count])) + '</div>';
     html += table(['Class', 'Type name', 'Used'], r.types.map(x => [esc(x.cls.replace(/Type$/, '')), esc(x.name), fmtN(x.count)]), { right: [2], wrap: [1], mono: [0] });
     html += '</section>';
@@ -2494,7 +2497,11 @@ tr.det td { background: var(--bg); }
   function markOpen(which, name, kind, detail, opts) {
     openState[which] = { name, kind, detail, go: opts && opts.go, sample: !!(opts && opts.sample) };
     drawLoaded();
-    if (!(opts && opts.sample)) document.querySelector('header').classList.add('loaded');
+    if (!(opts && opts.sample)) {
+      const hd = document.querySelector('header');
+      if (hd.classList.contains('snap')) { hd.classList.remove('snap'); $('pagetitle').textContent = 'BIM File Viewer'; document.title = 'BIM File Viewer'; }
+      hd.classList.add('loaded');
+    }
   }
   // A scan always gets an IFC outline, so show which IFC that is: the example one unless the user opened their own.
   function afterScanLoaded() {
@@ -2620,7 +2627,9 @@ tr.det td { background: var(--bg); }
     const when = sn.analyzedAt ? ' · analyzed ' + sn.analyzedAt.slice(0, 10) : '';
     if (sn.kind === 'ifc') { renderIfc(sn.data, null); markOpen('file', sn.name, 'IFC file', fmtBytes(sn.size) + when, { sample: true }); }
     else { render(sn.data, null); markOpen('file', sn.name, 'Revit file', fmtBytes(sn.size) + when, { sample: true }); }
-    document.querySelector('header').classList.add('loaded');
+    const hd = document.querySelector('header');
+    hd.classList.add('loaded', 'snap'); $('loadedline').hidden = true;
+    $('pagetitle').textContent = sn.name; document.title = sn.name;
   }
   if (SNAPSHOT) showSnapshot(SNAPSHOT); else showRvtSample();
 })();
