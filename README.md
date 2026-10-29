@@ -44,7 +44,9 @@ The repository includes a skill, `skills/analyze-bim-file/SKILL.md`, that does t
 
 ### Set it up
 
-1. Get the skill into your Claude account. Start a chat in Claude, attach `skills/analyze-bim-file/SKILL.md` and ask: "Create a skill from this file, keeping the text exactly as it is." Claude shows a card where you review and save it. If your Claude app has a place to upload skills, you can use that instead.
+1. Get the skill into your Claude account, either of two ways:
+   - In Claude, go to **Customize**, open the **Skills** page and click **Add skill**, then add `skills/analyze-bim-file/SKILL.md`.
+   - Or do it from a prompt. Start a chat, attach `skills/analyze-bim-file/SKILL.md` and ask: "Create a skill from this file, keeping the text exactly as it is." Claude shows a card where you review and save it.
 2. Use a Claude app where Artifacts and the code environment are available, since the skill publishes a page and runs the repository's tools.
 3. The skill downloads this repository when it runs, so keep the repository public, or give your Claude account access to it if it is private. It needs only Node and Python 3, which the code environment has. Nothing to install on your own computer.
 
