@@ -2,7 +2,7 @@
 //   node tools/snapshot.js <file.rvt|file.ifc> [out.json]
 // Then: python3 build.py --snapshot out.json --fragment page.html
 const fs = require('fs'), path = require('path');
-globalThis.pako = require('pako');
+globalThis.pako = require('../vendor/pako_inflate.min.js');   // bundled copy of pako 1.0.11 (MIT), so no npm install is needed
 require('../src/rvt.js'); require('../src/ifc.js');
 (async () => {
   const file = process.argv[2], out = process.argv[3] || 'snapshot.json';

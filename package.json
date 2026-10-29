@@ -9,9 +9,7 @@
     "test:browser": "node tests/pw_layout.js && node tests/pw8.js && node tests/pw5.js && node tests/pw3.js && node tests/pw2.js"
   },
   "devDependencies": {
-    "playwright": "^1.47.0"
-  },
-  "dependencies": {
+    "playwright": "^1.47.0",
     "pako": "1.0.11"
   }
 }

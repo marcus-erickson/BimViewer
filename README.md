@@ -43,8 +43,7 @@ The artifact is private to you until you share it. Anyone you share it with uses
 A snapshot is a page that opens already showing one file's results, with Ask Claude ready, so it can be shared as a report. It is the basis of the analyze-a-file skill.
 
 ```
-npm install
-node tools/snapshot.js path/to/model.ifc snapshot.json      # or an .rvt file
+node tools/snapshot.js path/to/model.ifc snapshot.json      # or an .rvt file; needs only Node, no npm install
 python3 build.py --snapshot snapshot.json --fragment page.html
 ```
 
@@ -153,6 +152,7 @@ src/
   scan.js            Scan streaming reader, measurements, QA rules
   viewer.js          Minimal WebGL point and line renderer with picking
 data/                Example results embedded in the page
+vendor/              Bundled pako 1.0.11 (MIT) used by tools/snapshot.js
 tools/               Scripts that regenerate the embedded examples, and snapshot.js
 tests/               Node and browser tests
 research/            Python scripts used to explore the Revit file format
@@ -165,7 +165,7 @@ build.py             Assembles dist/index.html (add --fragment OUT for a copy wi
 Requirements: Node 18 or newer and Python 3. The built page does not need either.
 
 ```
-npm install          # pako (needed by tools/snapshot.js) and playwright (tests only)
+npm install          # pako and playwright, only needed for tests and the other tools
 python3 build.py     # rebuilds dist/index.html from src/ and data/
 ```
 
