@@ -36,7 +36,23 @@ The chat works only when the page runs inside Claude, because it asks Claude thr
 3. Ask: "Publish this file as an artifact exactly as it is, with the sample capability turned on so the chat works."
 4. Open the artifact, go to the Ask Claude screen, ask a question, and approve the one-time permission prompt.
 
-The artifact is private to you until you share it. Anyone you share it with uses their own Claude usage when they ask a question. These steps are written from how the page was built and published here, and have not been tried by anyone else, so tell me if a step does not work.
+The artifact is private to you until you share it. Anyone you share it with uses their own Claude usage when they ask a question. These steps are written from how the page was built and published here, and have not been tried by anyone else. If a step does not work, open an issue.
+
+## Claude skill: analyze a file
+
+The repository includes a skill, `skills/analyze-bim-file/SKILL.md`, that does the whole job from a chat. You attach a Revit (.rvt) or IFC (.ifc) file, or say which file to use, and Claude reads it, builds a copy of the viewer that opens already showing that file's results, and publishes it as a Claude artifact with the Ask Claude chat turned on. If you already have an analysis page it asks whether to replace it or make a new one.
+
+### Set it up
+
+1. Get the skill into your Claude account. Start a chat in Claude, attach `skills/analyze-bim-file/SKILL.md` and ask: "Create a skill from this file, keeping the text exactly as it is." Claude shows a card where you review and save it. If your Claude app has a place to upload skills, you can use that instead.
+2. Use a Claude app where Artifacts and the code environment are available, since the skill publishes a page and runs the repository's tools.
+3. The skill downloads this repository when it runs, so keep the repository public, or give your Claude account access to it if it is private. It needs only Node and Python 3, which the code environment has. Nothing to install on your own computer.
+
+### Use it
+
+Attach a file and say "analyze this", or just say "analyze a BIM file" and Claude asks for one. You will see an approval prompt for publishing the page, and on your first question in the page, a permission prompt for using your Claude account. The reply gives the link card, a few findings from the file, and a reminder that the page contains the file's facts, so treat the link like the file when sharing.
+
+Limits: Revit and IFC files only for now. Scan folders are not supported by the skill yet, because they are too large to send; open them in the viewer page directly. Revit files give project details and names but not element counts. The pieces have been tested separately, but the skill has not been run end to end on anyone else's account. If a step does not work, open an issue.
 
 ## Snapshots (preloaded pages)
 
@@ -152,6 +168,7 @@ src/
   scan.js            Scan streaming reader, measurements, QA rules
   viewer.js          Minimal WebGL point and line renderer with picking
 data/                Example results embedded in the page
+skills/              The analyze-bim-file Claude skill (SKILL.md)
 vendor/              Bundled pako 1.0.11 (MIT) used by tools/snapshot.js
 tools/               Scripts that regenerate the embedded examples, and snapshot.js
 tests/               Node and browser tests
