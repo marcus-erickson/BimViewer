@@ -29,7 +29,7 @@ const shots = process.env.SHOTS || '.';
   await pg.click('#nav >> text=Text and links'); expect(await pg.isVisible('#qtable table'), 'revit: text table visible');
   await pg.screenshot({ path: path.join(shots, 'layout_revit.png') });
 
-  await pg.click('#out [data-go=ifc]').catch(() => {});
+  await pg.click('[data-go=ifc]').catch(() => {});
   await pg.waitForSelector('#nav >> text=Model contents');
   console.log('ifc nav', await names());
   await pg.click('#nav >> text=Elements'); expect(await pg.isVisible('#etable table'), 'ifc: elements visible');
