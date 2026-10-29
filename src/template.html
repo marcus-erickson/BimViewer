@@ -232,7 +232,7 @@ tr.det td { background: var(--bg); }
   const SAMPLE_IFC = /*SAMPLEIFC*/null;
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  const fmtBytes = n => n == null ? '' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
+  const fmtBytes = n => n == null ? '' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
   const fmtN = n => Number(n).toLocaleString('en-US');
 
   const STREAM_NOTES = {
@@ -890,15 +890,24 @@ tr.det td { background: var(--bg); }
   }
 
   const openState = {};
-  function markOpen(which, name, kind, detail, opts) {
-    openState[which] = { name, kind, detail, go: opts && opts.go };
+  function drawLoaded() {
     const L = $('loadedline');
     L.hidden = false;
     L.innerHTML = ['file', 'scan'].filter(k => openState[k]).map(k => {
       const o = openState[k];
       return '<div class="li"><span class="lk">' + esc(o.kind) + '</span><span class="ln">' + esc(o.name) + '</span><span class="ld">' + esc(o.detail) + '</span>' + (o.go ? '<button class="ghost" type="button" data-go="' + o.go + '" style="padding:2px 10px">' + (o.go === 'ifc' ? 'See the IFC example' : 'See the Revit example') + '</button>' : '') + '</div>';
     }).join('');
-    document.querySelector('header').classList.toggle('loaded', !(opts && opts.sample));
+  }
+  function markOpen(which, name, kind, detail, opts) {
+    openState[which] = { name, kind, detail, go: opts && opts.go, sample: !!(opts && opts.sample) };
+    drawLoaded();
+    if (!(opts && opts.sample)) document.querySelector('header').classList.add('loaded');
+  }
+  // A scan always gets an IFC outline, so show which IFC that is: the example one unless the user opened their own.
+  function afterScanLoaded() {
+    const f = openState.file;
+    if (f && f.sample && lastIfc === SAMPLE_IFC) markOpen('file', 'L1_C106_IFC.ifc', 'IFC file', 'Example, used for the IFC outline on the scan', { sample: true });
+    else if (f && f.sample) { delete openState.file; drawLoaded(); }
   }
   async function loadScan(files) {
     const st = $('sstatus'), pw = $('sprogwrap'), pr = $('sprog');
@@ -918,6 +927,7 @@ tr.det td { background: var(--bg); }
       });
       renderScan(res);
       markOpen('scan', ((files[0].webkitRelativePath || '').split('/')[0]) || 'Scan folder', 'Scan folder', fmtN(res.objs.length) + ' objects measured in ' + res.seconds.toFixed(1) + ' s, ' + fmtBytes(files.reduce((a, f) => a + f.size, 0)));
+      afterScanLoaded();
       st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
