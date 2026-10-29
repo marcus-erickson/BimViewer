@@ -930,7 +930,6 @@ tr.det td { background: var(--bg); }
       afterScanLoaded();
       st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
-      window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
     } catch (e) {
       pw.hidden = true; st.className = 'status err';
       st.textContent = 'Could not read the scan files. ' + (e && e.message ? e.message : e);
@@ -987,7 +986,6 @@ tr.det td { background: var(--bg); }
         markOpen('file', file.name, 'IFC file', fmtBytes(file.size));
         st.textContent = '';
         setTimeout(() => { pw.hidden = true; }, 600);
-        window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
         return;
       }
       const buf = await file.arrayBuffer();
@@ -997,7 +995,6 @@ tr.det td { background: var(--bg); }
       markOpen('file', file.name, 'Revit file', fmtBytes(file.size));
       st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
-      window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
     } catch (e) {
       pw.hidden = true; st.className = 'status err';
       st.textContent = 'Could not read this file. ' + (e && e.message ? e.message : e);
