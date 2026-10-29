@@ -10,15 +10,33 @@ Everything runs in the browser. No file is uploaded anywhere.
 
 ![Revit example](docs/img/revit-example.png)
 
-## Quick start
+## Ways to run it
 
-1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host).
+| | In a browser | In Claude |
+|---|---|---|
+| What you open | `dist/index.html` | The same page, published as a Claude artifact |
+| Revit, IFC and scan viewing | Yes | Yes |
+| Ask Claude chat | No, the screen says it cannot reach Claude | Yes, using your own Claude account |
+| Setup | None | Ask Claude to publish the page (steps below) |
+
+### In a browser
+
+1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host such as GitHub Pages).
 2. The page opens with built-in examples (a Revit sample and an IFC sample), so you can look around before loading anything.
 3. Load your own file with the buttons under the title.
 
-The page loads one small library (pako 1.0.11) from cdnjs, so it needs an internet connection the first time.
+The page loads one small library (pako 1.0.11) from cdnjs, so it needs an internet connection the first time. You do not need Node, Python or Revit to use it. Those are only needed if you change the code.
 
-You do not need Node, Python or Revit to use it. Those are only needed if you change the code.
+### In Claude (to use the chat)
+
+The chat works only when the page runs inside Claude, because it asks Claude through the viewer's own account. No API key is stored anywhere in this repository, and nobody else's account can be used.
+
+1. Start a chat in Claude with the Artifact feature available (Claude on the web or the desktop app, or Claude Code).
+2. Attach `dist/claude-artifact.html`, or paste its contents.
+3. Ask: "Publish this file as an artifact exactly as it is, with the sample capability turned on so the chat works."
+4. Open the artifact, go to the Ask Claude screen, ask a question, and approve the one-time permission prompt.
+
+The artifact is private to you until you share it. Anyone you share it with uses their own Claude usage when they ask a question. These steps are written from how the page was built and published here, and have not been tried by anyone else, so tell me if a step does not work.
 
 ## Using it
 
@@ -88,7 +106,7 @@ You get:
 
 The **Ask Claude** screen lets you ask questions about whatever is loaded, such as "which classes are missing material data?" or "which chairs look wrong?". Claude sees a short text summary of the file (file facts, class counts, readiness percentages, the Sanity check flags and the selected object) and can run two searches on the real data in the page, `find_elements` for IFC and `find_objects` for scans, so counts and lists come from the file and not from a guess. Open **What gets sent to Claude** on that screen to see the exact summary. No point data, geometry or raw file contents are sent. The **Chat enabled** box turns it off.
 
-Chat only works in the version published as a Claude artifact, because it uses the viewer's own Claude account through the artifact `sample` capability. In a standalone copy of `dist/index.html` the screen says it cannot reach Claude. A typical question sends roughly 1,000 to 4,000 tokens.
+Chat only works when the page runs as a Claude artifact (see Ways to run it above). In a standalone copy of `dist/index.html` the screen says it cannot reach Claude. A typical question sends roughly 1,000 to 4,000 tokens.
 
 ### IFC overlay
 
@@ -115,6 +133,7 @@ These are rules of thumb. A flag means the label and the shape disagree, not whi
 
 ```
 dist/index.html      The built page, one self-contained file
+dist/claude-artifact.html  The same page without the html wrapper, for publishing as a Claude artifact
 src/
   template.html      Page markup, styles and UI logic
   rvt.js             Revit container reader (OLE streams, thumbnail, strings)

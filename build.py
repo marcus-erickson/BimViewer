@@ -26,3 +26,7 @@ else:
 os.makedirs(os.path.dirname(out), exist_ok=True)
 open(out, 'w', encoding='utf-8').write(t)
 print('wrote', out, len(t), 'bytes')
+if out.endswith('index.html'):
+    frag = os.path.join(here, 'dist', 'claude-artifact.html')
+    open(frag, 'w', encoding='utf-8').write(t[t.index('<title>'):t.rindex('\n</body>')])
+    print('wrote', frag)
