@@ -123,6 +123,8 @@ header .lede { max-width: none; }
 header.loaded .openrow { margin-top: 10px; }
 header.snap .lede { display: none; }
 header.snap .loadedline { display: none; }
+.promo[hidden] { display: none; }
+.promo { margin-top: 14px; padding: 12px 14px; background: var(--accent-soft); border-radius: 6px; display: flex; flex-direction: column; gap: 8px; }
 .loadedline { display: flex; flex-wrap: wrap; gap: 6px 32px; margin-top: 12px; }
 .li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
 .lk { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
@@ -176,6 +178,11 @@ tr.det td { background: var(--bg); }
   <header>
     <h1 id="pagetitle">BIM File Viewer</h1>
     <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files are never uploaded. The optional Ask Claude screen sends a short summary only when you ask a question.</p>
+  <div class="promo" id="promo" hidden>
+    <div><strong>Also available as a Claude skill.</strong> Attach a Revit or IFC file in Claude and get this viewer back with that file's results already loaded and an Ask Claude chat on top.</div>
+    <div class="tools"><button type="button" id="skdl">Download skill file</button><button type="button" class="ghost" id="skcopy">Copy skill text</button><span class="cap" id="skmsg"></span></div>
+    <div class="cap">To install: in Claude, go to Customize, open the Skills page and click Add skill, then choose the downloaded SKILL.md. Or attach it in a chat and ask Claude to create a skill from it.</div>
+  </div>
   <div class="loadedline" id="loadedline" hidden></div>
   <div class="openrow" id="openrow">
   <div class="drop" id="drop">
@@ -238,6 +245,7 @@ tr.det td { background: var(--bg); }
 (function () {
   const SAMPLE = /*SAMPLE*/null;
   const SAMPLE_IFC = /*SAMPLEIFC*/null;
+  const SKILL_MD = /*SKILLMD*/"";
   const SNAPSHOT = /*SNAPSHOT*/null;   // set by build.py --snapshot: the page opens with this file's results
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -1178,5 +1186,16 @@ tr.det td { background: var(--bg); }
     $('pagetitle').textContent = sn.name; document.title = sn.name;
   }
   if (SNAPSHOT) showSnapshot(SNAPSHOT); else showRvtSample();
+  // Outside Claude (a downloaded copy or a web host) offer the skill file. Inside Claude the page has window.claude and the promo stays hidden.
+  if (!window.claude && !SNAPSHOT && SKILL_MD) {
+    $('promo').hidden = false;
+    $('skdl').addEventListener('click', () => {
+      try {
+        const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([SKILL_MD], { type: 'text/markdown' })); a.download = 'SKILL.md';
+        document.body.appendChild(a); a.click(); a.remove(); $('skmsg').textContent = 'Saved as SKILL.md';
+      } catch (e) { $('skmsg').textContent = 'Download was blocked here. Use Copy skill text instead.'; }
+    });
+    $('skcopy').addEventListener('click', e => copyText(SKILL_MD, e.currentTarget));
+  }
 })();
 </script>

@@ -21,7 +21,9 @@ Everything runs in the browser. No file is uploaded anywhere.
 
 ### In a browser
 
-1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host such as GitHub Pages).
+Outside Claude the page also shows a box at the top offering the Claude skill, with a download button for `SKILL.md`. Inside Claude that box is hidden.
+
+1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host. For GitHub Pages, publish from the top folder of the `main` branch and the top-level `index.html` is the page).
 2. The page opens with built-in examples (a Revit sample and an IFC sample), so you can look around before loading anything.
 3. Load your own file with the buttons under the title.
 
@@ -161,6 +163,7 @@ These are rules of thumb. A flag means the label and the shape disagree, not whi
 ## Repository layout
 
 ```
+index.html           A copy of the built page at the top level, so GitHub Pages can serve it
 dist/index.html      The built page, one self-contained file
 dist/claude-artifact.html  The same page without the html wrapper, for publishing as a Claude artifact
 src/

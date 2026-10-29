@@ -18,6 +18,8 @@ parts = {
 }
 args = sys.argv[1:]
 snap = args[args.index('--snapshot') + 1] if '--snapshot' in args else None
+import json
+parts['/*SKILLMD*/""'] = json.dumps(rd('skills', 'analyze-bim-file', 'SKILL.md')).replace('</', '<\\/')
 parts['/*SNAPSHOT*/null'] = open(snap, encoding='utf-8').read().replace('</', '<\\/') if snap else 'null'
 for k, v in parts.items():
     assert k in t, 'missing placeholder ' + k
@@ -33,5 +35,7 @@ open(out, 'w', encoding='utf-8').write(t)
 print('wrote', out, len(t), 'bytes')
 if out.endswith('index.html'):
     frag = os.path.join(here, 'dist', 'claude-artifact.html')
+    open(os.path.join(here, 'index.html'), 'w', encoding='utf-8').write(t)
+    print('wrote', os.path.join(here, 'index.html'))
     open(frag, 'w', encoding='utf-8').write(t[t.index('<title>'):t.rindex('\n</body>')])
     print('wrote', frag)
