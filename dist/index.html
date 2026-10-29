@@ -115,9 +115,14 @@ details summary { cursor: pointer; font-weight: 500; }
 .app { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 22px; align-items: start; }
 .side { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 2px; }
 .main { min-width: 0; }
-.side .drop { flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 12px; gap: 10px; }
-.side .drop .btn { display: block; text-align: center; }
-.side .drop > div { flex: none !important; }
+.openrow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.openrow .drop { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 10px; }
+.openrow .drop > div { flex: none !important; width: 100%; }
+header.loaded .lede, header.loaded .drop .hint { display: none; }
+header.loaded .openrow { margin-top: 10px; }
+header.loaded .drop { padding: 10px 14px; }
+.now { font-weight: 600; overflow-wrap: anywhere; }
+.now small { display: block; font-weight: 400; color: var(--muted); }
 .nav { display: flex; flex-direction: column; gap: 3px; }
 .navtitle { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 2px 8px 6px; overflow-wrap: anywhere; }
 .navbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; background: transparent; color: var(--fg); border: 0; border-left: 3px solid transparent; border-radius: 4px; padding: 8px 10px; font-weight: 500; }
@@ -133,6 +138,7 @@ details summary { cursor: pointer; font-weight: 500; }
 @media (max-width: 1150px) { .v2 { grid-template-columns: minmax(0, 1fr); } .v2 .selbox { margin-top: 10px; } }
 @media (max-width: 900px) {
   .app { grid-template-columns: minmax(0, 1fr); }
+  .openrow { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; max-height: none; overflow: visible; }
   .nav { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
   .navtitle { display: none; }
@@ -156,17 +162,14 @@ tr.det td { background: var(--bg); }
   <header>
     <h1>BIM File Reader</h1>
     <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. Everything runs in your browser and your files never leave your computer.</p>
-  </header>
-
-  <div class="app">
-  <aside class="side">
+  <div class="openrow" id="openrow">
   <div class="drop" id="drop">
     <div>
-      <strong>Open a Revit or IFC file</strong>
+      <strong class="ttl">Open a Revit or IFC file</strong><div class="now" id="nowfile" hidden></div>
       <div class="hint">Drop an .rvt or .ifc file here, or choose one. Very large IFC files can be slow.</div>
     </div>
     <div>
-      <label for="file" class="btn" id="pick" role="button" tabindex="0">Choose file</label>
+      <label for="file" class="btn" id="pick" role="button" tabindex="0"><span class="lbl">Choose file</span></label>
       <input type="file" id="file" accept=".rvt,.ifc">
     </div>
     <div style="flex-basis:100%">
@@ -177,13 +180,13 @@ tr.det td { background: var(--bg); }
 
   <div class="drop" id="scanbox">
     <div style="flex:1 1 320px">
-      <strong>Open a scan folder</strong>
+      <strong class="ttl">Open a scan folder</strong><div class="now" id="nowscan" hidden></div>
       <div class="hint">The folder of classified point files (S1, S2 and so on, holding files like chair_1.txt). Read in your browser, never uploaded.</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="mode" class="cap">Detail</label>
       <select id="mode" class="search" style="width:auto"><option value="20">Quick (every 20th point)</option><option value="1">Exact (every point)</option></select>
-      <label for="dir" class="btn" id="dirpick" role="button" tabindex="0">Choose scan folder</label>
+      <label for="dir" class="btn" id="dirpick" role="button" tabindex="0"><span class="lbl">Choose scan folder</span></label>
       <input type="file" id="dir" webkitdirectory multiple>
     </div>
     <div style="flex-basis:100%">
@@ -192,6 +195,11 @@ tr.det td { background: var(--bg); }
     </div>
   </div>
 
+  </div>
+  </header>
+
+  <div class="app">
+  <aside class="side">
   <nav id="nav" class="nav" aria-label="Screens"></nav>
   </aside>
   <main class="main"><div id="out"></div></main>
@@ -2328,6 +2336,13 @@ tr.det td { background: var(--bg); }
     drawObjs();
   }
 
+  function markOpen(which, name, detail) {
+    const box = $(which === 'scan' ? 'scanbox' : 'drop'), now = $(which === 'scan' ? 'nowscan' : 'nowfile');
+    now.hidden = false; now.innerHTML = esc(name) + (detail ? '<small>' + esc(detail) + '</small>' : '');
+    box.querySelector('.ttl').hidden = true;
+    box.querySelector('.lbl').textContent = which === 'scan' ? 'Open a different scan folder' : 'Open a different Revit or IFC file';
+    document.querySelector('header').classList.add('loaded');
+  }
   async function loadScan(files) {
     const st = $('sstatus'), pw = $('sprogwrap'), pr = $('sprog');
     st.className = 'status'; pw.hidden = false; pr.style.width = '1%';
@@ -2345,6 +2360,7 @@ tr.det td { background: var(--bg); }
         st.textContent = 'File ' + (p.files + 1) + ' of ' + p.of + ': ' + p.name.split('/').slice(-2).join('/') + '  (' + fmtBytes(p.bytes) + ' of ' + fmtBytes(p.total) + ', ' + Math.round(p.elapsed) + ' s)';
       });
       renderScan(res);
+      markOpen('scan', ((files[0].webkitRelativePath || '').split('/')[0]) || 'Scan folder', 'Scan folder, ' + fmtN(res.objs.length) + ' objects');
       st.textContent = 'Measured ' + fmtN(res.objs.length) + ' objects in ' + res.seconds.toFixed(1) + ' s';
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
@@ -2401,6 +2417,7 @@ tr.det td { background: var(--bg); }
         const r = IFC.readIfc(text);
         r.fileName = file.name; r.fileSize = file.size;
         renderIfc(r, null);
+        markOpen('file', file.name, 'IFC file, ' + fmtBytes(file.size));
         st.textContent = 'Loaded ' + file.name;
         setTimeout(() => { pw.hidden = true; }, 600);
         window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
@@ -2410,6 +2427,7 @@ tr.det td { background: var(--bg); }
       const res = await RVT.parseRvt(buf, file.name, (m, f) => { st.textContent = m; pr.style.width = Math.round(f * 100) + '%'; });
       const vm = RVT.viewModel(res, 0);
       render(vm, null);
+      markOpen('file', file.name, 'Revit file, ' + fmtBytes(file.size));
       st.textContent = 'Loaded ' + file.name;
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
@@ -2431,8 +2449,8 @@ tr.det td { background: var(--bg); }
 
   const GO_IFC = ' <button class="ghost" type="button" data-go="ifc" style="margin-left:8px;padding:3px 10px">See the IFC example</button>';
   const GO_RVT = ' <button class="ghost" type="button" data-go="rvt" style="margin-left:8px;padding:3px 10px">See the Revit example</button>';
-  function showRvtSample() { render(SAMPLE, 'Example result for <strong>racbasicsampleproject.rvt</strong>, one of Autodesk\'s Revit 2024 sample files. Open your own file on the left to replace it.' + GO_IFC); }
-  function showIfcSample() { renderIfc(SAMPLE_IFC, 'Example result for <strong>L1_C106_IFC.ifc</strong>, a Revit 2023 export of one classroom. Open your own file on the left to replace it.' + GO_RVT); }
+  function showRvtSample() { render(SAMPLE, 'Example result for <strong>racbasicsampleproject.rvt</strong>, one of Autodesk\'s Revit 2024 sample files. Open your own file above to replace it.' + GO_IFC); }
+  function showIfcSample() { renderIfc(SAMPLE_IFC, 'Example result for <strong>L1_C106_IFC.ifc</strong>, a Revit 2023 export of one classroom. Open your own file above to replace it.' + GO_RVT); }
   $('out').addEventListener('click', e => {
     const b = e.target.closest('[data-go]');
     if (b) { if (b.dataset.go === 'ifc') showIfcSample(); else showRvtSample(); return; }
