@@ -10,7 +10,7 @@ const {chromium}=require('playwright');
  await pg.waitForSelector('#qtable table',{state:'attached'});
  await pg.setInputFiles('#dir',(process.env.BIM_SAMPLES||'samples')+'/BIM sample/L1_C106_Slices');
  await pg.waitForSelector('#otable table',{state:'attached',timeout:60000});
- await pg.click('#nav >> text=Label checks'); console.log(await pg.locator('#qaflags').innerText());
+ await pg.click('#nav >> text=Sanity checks'); console.log(await pg.locator('#qaflags').innerText());
  await pg.locator('[data-show]').first().click(); await pg.waitForTimeout(500);
  console.log((await pg.textContent('#vsel')).slice(0,200));
  await pg.click('#nav >> text=All objects'); await pg.check('#oflag'); console.log(await pg.textContent('#ocount'));

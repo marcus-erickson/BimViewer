@@ -36,7 +36,7 @@ const shots = process.env.SHOTS || '.';
   await pg.screenshot({ path: path.join(shots, 'layout_ifc.png') });
 
   await pg.setInputFiles('#dir', path.join(SAMPLES, 'BIM sample/L1_C106_Slices'));
-  await pg.waitForSelector('#nav >> text=Label checks', { timeout: 90000 });
+  await pg.waitForSelector('#nav >> text=Sanity checks', { timeout: 90000 });
   console.log('scan nav', await names(), 'visible', await visible());
   expect(await pg.isVisible('#vcanvas') || (await visible())[0] !== '3D view', 'scan: canvas visible when 3D view is open');
   await pg.click('#nav >> text=3D view');
@@ -58,7 +58,7 @@ const shots = process.env.SHOTS || '.';
   await pg.click('#nav >> text=All objects'); expect(await pg.isVisible('#otable table'), 'scan: objects table visible');
   await pg.click('#nav >> text=3D view'); await pg.waitForTimeout(400);
   const n2 = await lit(); expect(n2 > 500, 'scan: 3D view still draws after switching back (' + n2 + ')');
-  await pg.click('#nav >> text=Label checks');
+  await pg.click('#nav >> text=Sanity checks');
   await pg.locator('[data-show]').first().click(); await pg.waitForTimeout(300);
   expect((await visible())[0] === '3D view', 'scan: Show in 3D switches to the 3D screen');
   expect((await pg.locator('#vsel').innerText()).includes('window'), 'scan: Show in 3D selects the flagged object');

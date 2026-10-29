@@ -389,7 +389,7 @@ tr.det td { background: var(--bg); }
   const SCREEN_ORDER = {
     revit: ['Overview', 'Readiness', 'Inside the file', 'Names and units', 'Text and links', 'Limits'],
     ifc: ['Overview', 'Model contents', 'Readiness', 'Types and materials', 'Property sets', 'Elements', 'Limits'],
-    scan: ['3D view', 'Summary', 'Classes and model', 'Label checks', 'All objects', 'Limits']
+    scan: ['3D view', 'Summary', 'Classes and model', 'Sanity checks', 'All objects', 'Limits']
   };
   let currentKind = 'revit';
   function layoutScreens(kind, title, badges) {
@@ -788,10 +788,10 @@ tr.det td { background: var(--bg); }
     html += table(['Item', 'Scan segments', 'Scan points', 'IFC elements', 'Reading'], cmp.map(r => [esc(r.cls), r.seg ? fmtN(r.seg) : '', r.pts ? fmtN(r.pts) : '', r.ifc ? fmtN(r.ifc) : '', '<span class="tag">' + esc(r.status) + '</span>']), { right: [1, 2, 3] });
     html += '<p class="cap">Segments are not the same as objects. One real chair can be split into several segments, and the model counts whole elements. Read this table as where each side has coverage, not as an exact tally.</p></section>';
 
-    html += '<div data-screen="Label checks"></div>';
+    html += '<div data-screen="Sanity checks"></div>';
     // QA
     const Q = res.qa, sevTag = v => '<span class="tag" style="' + (v === 'high' ? 'background:#fde2e0;color:#9b1c13' : v === 'med' ? 'background:#fdecc8;color:#7a4b00' : '') + '">' + (v === 'high' ? 'Likely wrong' : v === 'med' ? 'Check' : 'Minor') + '</span>';
-    html += '<section class="card"><div class="head"><h2>Label sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor under each object (lowest floor in the scan is ' + m2(Q.floor) + ' m, so pits and platforms are handled). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
+    html += '<section class="card"><div class="head"><h2>Sanity checks</h2><p class="sub">Compares each segment to what its class label should look like, using size and height above the floor under each object (lowest floor in the scan is ' + m2(Q.floor) + ' m, so pits and platforms are handled). ' + fmtN(Q.flagged.length) + ' of ' + fmtN(Q.total) + ' segments flagged.</p>' +
       copyBtn('sqa', ['Severity', 'Object', 'Slice', 'Class', 'Problem'], Q.flagged.map(o => [Q.flags.get(o)[0].sev, o.name, o.slice, o.cls, Q.flags.get(o).map(x => x.msg).join(' ')])) + '</div>';
     if (!Q.flagged.length) html += '<p>Nothing looks out of place for the rules checked.</p>';
     else {
@@ -812,7 +812,7 @@ tr.det td { background: var(--bg); }
       '<li>Every point. The 3D view shows a thinned sample so that large scans stay smooth.</li></ul></div>';
 
     $('out').innerHTML = html;
-    layoutScreens('scan', 'Scan folder', { 'Label checks': res.qa.flagged.length || '' });
+    layoutScreens('scan', 'Scan folder', { 'Sanity checks': res.qa.flagged.length || '' });
     document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', () => copyText(csvStore[b.dataset.copy], b)));
     startViewer(res);
     const showObj = o => {

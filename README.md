@@ -28,7 +28,7 @@ The page has a menu on the left and one screen at a time on the right. The two O
 |---|---|
 | Revit | Overview, Readiness, Inside the file, Names and units, Text and links, Limits |
 | IFC | Overview, Model contents, Readiness, Types and materials, Property sets, Elements, Limits |
-| Scan folder | 3D view, Summary, Classes and model, Label checks (with a count of flags), All objects, Limits |
+| Scan folder | 3D view, Summary, Classes and model, Sanity checks (with a count of flags), All objects, Limits |
 
 ### Revit files
 
@@ -97,11 +97,11 @@ The model and the scan use different coordinate systems (the IFC is in project c
 
 Treat a low alignment score as a sign to adjust by eye. Auto-align has only been tried on a four-slice subset of the sample scan, not on a full one.
 
-### Label sanity checks
+### Sanity checks
 
-The Label checks screen flags segments whose label does not match their shape, using size and height above the floor under each object, so a room with a pit or raised platform is handled. Examples: a chair-sized segment labeled window, a chair taller than 1.5 m, a light near the floor, a segment whose size, shape and height fit a different class much better than its own label (it needs at least 3 other segments of its own class and 4 of the other class to judge), or a chair far larger or smaller than the other chairs. Pieces that are only a flat surface (such as a tabletop without legs) or that touch the edge of their slice are noted as probably partial. Windows are not checked for height because floor-to-ceiling glass is normal, and walls, floors, lights and tables are not compared with their peers because their sizes vary. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
+The Sanity checks screen flags segments whose label does not match their shape, using size and height above the floor under each object, so a room with a pit or raised platform is handled. Examples: a chair-sized segment labeled window, a chair taller than 1.5 m, a light near the floor, a segment whose size, shape and height fit a different class much better than its own label (it needs at least 3 other segments of its own class and 4 of the other class to judge), or a chair far larger or smaller than the other chairs. Pieces that are only a flat surface (such as a tabletop without legs) or that touch the edge of their slice are noted as probably partial. Windows are not checked for height because floor-to-ceiling glass is normal, and walls, floors, lights and tables are not compared with their peers because their sizes vary. Each flag is rated Likely wrong, Check or Minor, with a plain-language reason and a **Show in 3D** button. The object table has a QA column and a Flagged only filter.
 
-![Label checks](docs/img/label-checks.png)
+![Sanity checks](docs/img/label-checks.png)
 
 These are rules of thumb. A flag means the label and the shape disagree, not which one is wrong. The thresholds live in the `RULES` table in `src/scan.js` and are easy to adjust.
 
