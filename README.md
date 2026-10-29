@@ -14,7 +14,7 @@ Everything runs in the browser. No file is uploaded anywhere.
 
 1. Open `dist/index.html` in Chrome, Edge or Firefox (double-click it, or serve the folder from any static web host).
 2. The page opens with built-in examples (a Revit sample and an IFC sample), so you can look around before loading anything.
-3. Load your own file with the two Open boxes at the top of the page.
+3. Load your own file with the buttons under the title.
 
 The page loads one small library (pako 1.0.11) from cdnjs, so it needs an internet connection the first time.
 
@@ -22,7 +22,7 @@ You do not need Node, Python or Revit to use it. Those are only needed if you ch
 
 ## Using it
 
-The two Open boxes at the top of the page load a Revit or IFC file, or a scan folder. Once something is loaded the intro text folds away and each box shows the name of what you opened, with a button to open a different one. Below that the page has a menu on the left and one screen at a time on the right. The menu lists the screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
+The page opens with two buttons under the title: one for a Revit or IFC file, one for a scan folder. You can also drop a file anywhere on the page. Once something is loaded the intro text folds away and the title row shows the name of what you opened, with a "Choose another file" button and the scan folder button beside it. The page below has a menu on the left and one screen at a time on the right. The menu lists the screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
 
 | File type | Screens |
 |---|---|

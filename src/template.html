@@ -110,14 +110,19 @@ details summary { cursor: pointer; font-weight: 500; }
 .app { display: grid; grid-template-columns: 270px minmax(0, 1fr); gap: 22px; align-items: start; }
 .side { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; display: flex; flex-direction: column; gap: 14px; padding-right: 2px; }
 .main { min-width: 0; }
-.openrow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
-.openrow .drop { flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 10px; }
-.openrow .drop > div { flex: none !important; width: 100%; }
-header.loaded .lede, header.loaded .drop .hint { display: none; }
+.openrow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 28px; margin-top: 16px; }
+.openrow .drop { background: none; border: 0; padding: 0; border-radius: 4px; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 6px 12px; }
+.openrow .drop.over { outline: 2px dashed var(--accent); outline-offset: 4px; }
+.openrow .drop > div { flex: none !important; }
+.openrow .ttl, .openrow .hint { display: none; }
+.openrow .status:empty { display: none; }
+.openrow .status { min-height: 0; }
+.openrow .progress { width: 220px; }
+header .lede { max-width: none; }
+header.loaded .lede { display: none; }
 header.loaded .openrow { margin-top: 10px; }
-header.loaded .drop { padding: 10px 14px; }
 .now { font-weight: 600; overflow-wrap: anywhere; }
-.now small { display: block; font-weight: 400; color: var(--muted); }
+.now small { font-weight: 400; color: var(--muted); margin-left: 8px; }
 .nav { display: flex; flex-direction: column; gap: 3px; }
 .navtitle { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 2px 8px 6px; overflow-wrap: anywhere; }
 .navbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; background: transparent; color: var(--fg); border: 0; border-left: 3px solid transparent; border-radius: 4px; padding: 8px 10px; font-weight: 500; }
@@ -130,11 +135,14 @@ header.loaded .drop { padding: 10px 14px; }
 .screen[hidden] { display: none; }
 .v2 { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; align-items: start; }
 .v2 .selbox { margin-top: 0; }
+.v2:has(.selbox[hidden]) { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 1150px) { .v2 { grid-template-columns: minmax(0, 1fr); } .v2 .selbox { margin-top: 10px; } }
 @media (max-width: 900px) {
   .app { grid-template-columns: minmax(0, 1fr); }
-  .openrow { grid-template-columns: minmax(0, 1fr); }
   .side { position: static; max-height: none; overflow: visible; }
+  .openrow { flex-direction: column; align-items: stretch; }
+  .openrow .drop, .openrow .drop > div { min-width: 0; max-width: 100%; }
+  .openrow .search { max-width: 100%; }
   .nav { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
   .navtitle { display: none; }
   .navbtn { width: auto; white-space: nowrap; border: 1px solid var(--rule); border-left-width: 1px; }
@@ -156,7 +164,7 @@ tr.det td { background: var(--bg); }
 <div class="wrap">
   <header>
     <h1>BIM File Reader</h1>
-    <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. Everything runs in your browser and your files never leave your computer.</p>
+    <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files never leave your computer.</p>
   <div class="openrow" id="openrow">
   <div class="drop" id="drop">
     <div>
@@ -164,7 +172,7 @@ tr.det td { background: var(--bg); }
       <div class="hint">Drop an .rvt or .ifc file here, or choose one. Very large IFC files can be slow.</div>
     </div>
     <div>
-      <label for="file" class="btn" id="pick" role="button" tabindex="0"><span class="lbl">Choose file</span></label>
+      <label for="file" class="btn" id="pick" role="button" tabindex="0"><span class="lbl">Open a Revit or IFC file</span></label>
       <input type="file" id="file" accept=".rvt,.ifc">
     </div>
     <div style="flex-basis:100%">
@@ -181,7 +189,7 @@ tr.det td { background: var(--bg); }
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
       <label for="mode" class="cap">Detail</label>
       <select id="mode" class="search" style="width:auto"><option value="20">Quick (every 20th point)</option><option value="1">Exact (every point)</option></select>
-      <label for="dir" class="btn" id="dirpick" role="button" tabindex="0"><span class="lbl">Choose scan folder</span></label>
+      <label for="dir" class="btn" id="dirpick" role="button" tabindex="0"><span class="lbl">Open a scan folder</span></label>
       <input type="file" id="dir" webkitdirectory multiple>
     </div>
     <div style="flex-basis:100%">
@@ -555,7 +563,7 @@ tr.det td { background: var(--bg); }
       groups.push({ cls, n: g.n, xyz, rgb, color: classColor(cls), ranges });
     }
     for (const o of objs) o.pts = null;
-    $('vsel').innerHTML = SEL_HINT;
+    $('vsel').innerHTML = ''; $('vsel').hidden = true;
     const total = groups.reduce((a, g) => a + g.n, 0);
     const info = $('vinfo');
     if (!groups.length) { info.textContent = 'No points to show.'; return; }
@@ -580,10 +588,10 @@ tr.det td { background: var(--bg); }
     setupOverlay(res, groups);
   }
 
-  const SEL_HINT = '<span class="cap">Click a point in the 3D view to see which scan object it belongs to and its measurements.</span>';
   function showSel(p) {
     const box = $('vsel');
-    if (!p) { box.innerHTML = SEL_HINT; return; }
+    if (!p) { box.innerHTML = ''; box.hidden = true; return; }
+    box.hidden = false;
     const o = p.range.obj;
     box.innerHTML = '<div class="head" style="margin-bottom:6px"><h3 style="margin:0;font-size:1rem">' + swatch(o.rgb) + esc(o.name) + ' <span class="tag">' + esc(o.slice) + '</span></h3><button class="ghost" type="button" id="vclear">Clear selection</button></div>' +
       '<div class="kvs"><span>Class</span><span>' + esc(o.cls) + '</span><span>Points</span><span>' + fmtN(o.points) + '</span>' +
@@ -751,8 +759,9 @@ tr.det td { background: var(--bg); }
       '<button class="ghost" type="button" id="vreset">Reset view</button><button class="ghost" type="button" id="vall">All on</button><button class="ghost" type="button" id="vnone">All off</button><span class="cap" id="vinfo"></span></div>' +
       '<div id="vclasses" class="tools" style="gap:6px 14px"></div>' +
       '<div id="ovbox" style="margin:8px 0"></div>' +
-      '<div class="v2"><div class="vwrap"><canvas id="vcanvas" aria-label="3D point cloud of the scanned room"></canvas></div>' +
-      '<div id="vsel" class="selbox" aria-live="polite"></div></div></section>';
+      '<div class="v2"><div><div class="vwrap"><canvas id="vcanvas" aria-label="3D point cloud of the scanned room"></canvas></div>' +
+      '<p class="cap" id="vhint" style="margin-top:8px">Click a point in the 3D view to see which scan object it belongs to and its measurements.</p></div>' +
+      '<div id="vsel" class="selbox" aria-live="polite" hidden></div></div></section>';
     html += '<div data-screen="Summary"></div>';
     html += '<div class="grid2"><section class="card"><div class="head"><h2>Scan summary</h2>' + copyBtn('sfacts', ['Field', 'Value'], facts) + '</div>';
     html += '<div class="tw"><table><tbody>' + facts.map(f => '<tr><td class="k">' + esc(f[0]) + '</td><td class="mono wrapany">' + esc(f[1]) + '</td></tr>').join('') + '</tbody></table></div>';
@@ -880,8 +889,7 @@ tr.det td { background: var(--bg); }
   function markOpen(which, name, detail) {
     const box = $(which === 'scan' ? 'scanbox' : 'drop'), now = $(which === 'scan' ? 'nowscan' : 'nowfile');
     now.hidden = false; now.innerHTML = esc(name) + (detail ? '<small>' + esc(detail) + '</small>' : '');
-    box.querySelector('.ttl').hidden = true;
-    box.querySelector('.lbl').textContent = which === 'scan' ? 'Open a different scan folder' : 'Open a different Revit or IFC file';
+        box.querySelector('.lbl').textContent = which === 'scan' ? 'Choose another scan folder' : 'Choose another file';
     document.querySelector('header').classList.add('loaded');
   }
   async function loadScan(files) {
@@ -959,7 +967,7 @@ tr.det td { background: var(--bg); }
         r.fileName = file.name; r.fileSize = file.size;
         renderIfc(r, null);
         markOpen('file', file.name, 'IFC file, ' + fmtBytes(file.size));
-        st.textContent = 'Loaded ' + file.name;
+        st.textContent = '';
         setTimeout(() => { pw.hidden = true; }, 600);
         window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
         return;
@@ -969,7 +977,7 @@ tr.det td { background: var(--bg); }
       const vm = RVT.viewModel(res, 0);
       render(vm, null);
       markOpen('file', file.name, 'Revit file, ' + fmtBytes(file.size));
-      st.textContent = 'Loaded ' + file.name;
+      st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
     } catch (e) {
@@ -984,9 +992,9 @@ tr.det td { background: var(--bg); }
   const drop = $('drop'), inp = $('file');
   inp.addEventListener('change', () => { if (inp.files[0]) load(inp.files[0]); });
   $('pick').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inp.click(); } });
-  ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
-  ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
-  drop.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
+  ['dragenter', 'dragover'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(t => document.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  document.addEventListener('drop', e => { const f = e.dataTransfer.files[0]; if (f) load(f); });
 
   const GO_IFC = ' <button class="ghost" type="button" data-go="ifc" style="margin-left:8px;padding:3px 10px">See the IFC example</button>';
   const GO_RVT = ' <button class="ghost" type="button" data-go="rvt" style="margin-left:8px;padding:3px 10px">See the Revit example</button>';
