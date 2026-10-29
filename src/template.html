@@ -69,7 +69,7 @@ button:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px 
 .note { background: var(--warn-bg); color: var(--warn-fg); border-radius: 4px; padding: 12px 14px; font-size: 0.95rem; }
 .note ul { margin: 6px 0 0; padding-left: 20px; }
 
-.top { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 22px; align-items: start; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 300px); gap: 22px; align-items: start; }
 @media (max-width: 760px) { .top { grid-template-columns: minmax(0, 1fr); } }
 .thumb-box { background: var(--surface); border: 1px solid var(--rule); border-radius: 6px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
 .thumb-box img { width: 100%; max-width: 270px; aspect-ratio: 1/1; object-fit: contain; image-rendering: pixelated; background: var(--bg); border: 1px solid var(--rule); align-self: center; }
@@ -302,17 +302,16 @@ tr.det td { background: var(--bg); }
 
     html += '<div data-screen="Overview"></div>';
     html += '<div class="top">';
+    html += '<section class="card"><div class="head"><h2>Project information</h2>' + (projRows.length ? copyBtn('proj', ['Field', 'Value'], projRows) : '') + '</div>';
+    html += projRows.length ? table(['Field', 'Value'], projRows.map(r => [esc(r[0]), esc(r[1])])) : '<p class="cap">No project details found.</p>';
+    html += '</section>';
     html += '<div class="thumb-box"><h2>Thumbnail</h2>';
     if (vm.thumb) html += '<img alt="Thumbnail stored in ' + esc(vm.fileName) + '" src="' + vm.thumb.data + '"><div class="cap">' + vm.thumb.w + ' by ' + vm.thumb.h + ' px, ' + fmtBytes(vm.thumb.bytes) + '. Revit saves this small picture of the active view; it is not the model.</div>';
     else html += '<div class="thumb-empty">This file has no thumbnail. Revit leaves it out when the file was saved without a preview.</div>';
     html += '</div>';
-    html += '<div style="display:flex;flex-direction:column;gap:22px;min-width:0">';
-    html += '<section class="card"><div class="head"><h2>Project information</h2>' + (projRows.length ? copyBtn('proj', ['Field', 'Value'], projRows) : '') + '</div>';
-    html += projRows.length ? table(['Field', 'Value'], projRows.map(r => [esc(r[0]), esc(r[1])])) : '<p class="cap">No project details found.</p>';
-    html += '</section>';
+    html += '</div>';
     html += '<section class="card"><div class="head"><h2>File facts</h2>' + copyBtn('facts', ['Field', 'Value'], fileRows) + '</div>';
     html += '<div class="tw"><table><tbody>' + fileRows.map(r => kv(r[0], r[1])).join('') + '</tbody></table></div></section>';
-    html += '</div></div>';
 
     html += '<div data-screen="Readiness"></div>';
     // readiness
