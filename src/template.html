@@ -235,6 +235,7 @@ tr.det td { background: var(--bg); }
 (function () {
   const SAMPLE = /*SAMPLE*/null;
   const SAMPLE_IFC = /*SAMPLEIFC*/null;
+  const SNAPSHOT = /*SNAPSHOT*/null;   // set by build.py --snapshot: the page opens with this file's results
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmtBytes = n => n == null ? '' : n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
@@ -1161,6 +1162,12 @@ tr.det td { background: var(--bg); }
     const row = e.target.closest('tr.row');
     if (row && row.nextElementSibling && row.nextElementSibling.classList.contains('det')) row.nextElementSibling.hidden = !row.nextElementSibling.hidden;
   });
-  showRvtSample();
+  function showSnapshot(sn) {
+    const when = sn.analyzedAt ? ' · analyzed ' + sn.analyzedAt.slice(0, 10) : '';
+    if (sn.kind === 'ifc') { renderIfc(sn.data, null); markOpen('file', sn.name, 'IFC file', fmtBytes(sn.size) + when, { sample: true }); }
+    else { render(sn.data, null); markOpen('file', sn.name, 'Revit file', fmtBytes(sn.size) + when, { sample: true }); }
+    document.querySelector('header').classList.add('loaded');
+  }
+  if (SNAPSHOT) showSnapshot(SNAPSHOT); else showRvtSample();
 })();
 </script>

@@ -2,6 +2,8 @@
 
   python3 build.py                  writes dist/index.html
   python3 build.py --fragment OUT   writes the same page without the <html> wrapper, for hosts that add their own
+  python3 build.py --snapshot SNAP.json --fragment OUT
+                                    embeds a snapshot made by tools/snapshot.js, so the page opens with that file's results
 """
 import os, sys
 here = os.path.dirname(os.path.abspath(__file__))
@@ -14,11 +16,14 @@ parts = {
     '/*SAMPLE*/null': rd('data', 'sample.json').replace('</', '<\\/'),
     '/*SAMPLEIFC*/null': rd('data', 'sample_ifc.json').replace('</', '<\\/'),
 }
+args = sys.argv[1:]
+snap = args[args.index('--snapshot') + 1] if '--snapshot' in args else None
+parts['/*SNAPSHOT*/null'] = open(snap, encoding='utf-8').read().replace('</', '<\\/') if snap else 'null'
 for k, v in parts.items():
     assert k in t, 'missing placeholder ' + k
     t = t.replace(k, v)
-if len(sys.argv) > 2 and sys.argv[1] == '--fragment':
-    out = sys.argv[2]
+if '--fragment' in args:
+    out = args[args.index('--fragment') + 1]
 else:
     out = os.path.join(here, 'dist', 'index.html')
     t = ('<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n'

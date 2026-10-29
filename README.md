@@ -38,6 +38,18 @@ The chat works only when the page runs inside Claude, because it asks Claude thr
 
 The artifact is private to you until you share it. Anyone you share it with uses their own Claude usage when they ask a question. These steps are written from how the page was built and published here, and have not been tried by anyone else, so tell me if a step does not work.
 
+## Snapshots (preloaded pages)
+
+A snapshot is a page that opens already showing one file's results, with Ask Claude ready, so it can be shared as a report. It is the basis of the analyze-a-file skill.
+
+```
+npm install
+node tools/snapshot.js path/to/model.ifc snapshot.json      # or an .rvt file
+python3 build.py --snapshot snapshot.json --fragment page.html
+```
+
+`page.html` is the viewer with that file's results built in. Publish it as a Claude artifact with the `sample` capability to get the chat. Scan folders are not supported by the snapshot command yet. A snapshot contains the file's facts, such as its name, size, project information and (for Revit) the names found inside, so treat the page like the file when you share it.
+
 ## Using it
 
 The page opens with two buttons under the title: one for a Revit or IFC file, one for a scan folder. You can also drop a file anywhere on the page. The intro text stays at the top. A line under it says what is open: the kind (Revit file, IFC file or scan folder), its name, and its size, plus the object count and measuring time for a scan. The two buttons stay in place to open a different file or folder. The page below has a menu on the left and one screen at a time on the right. The menu lists the screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
@@ -141,7 +153,7 @@ src/
   scan.js            Scan streaming reader, measurements, QA rules
   viewer.js          Minimal WebGL point and line renderer with picking
 data/                Example results embedded in the page
-tools/               Scripts that regenerate the embedded examples
+tools/               Scripts that regenerate the embedded examples, and snapshot.js
 tests/               Node and browser tests
 research/            Python scripts used to explore the Revit file format
 docs/img/            Screenshots
@@ -153,7 +165,7 @@ build.py             Assembles dist/index.html (add --fragment OUT for a copy wi
 Requirements: Node 18 or newer and Python 3. The built page does not need either.
 
 ```
-npm install          # pako and playwright, only needed for tests and tools
+npm install          # pako (needed by tools/snapshot.js) and playwright (tests only)
 python3 build.py     # rebuilds dist/index.html from src/ and data/
 ```
 
