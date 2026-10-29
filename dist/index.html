@@ -2364,8 +2364,10 @@ tr.det td { background: var(--bg); }
   // A scan always gets an IFC outline, so show which IFC that is: the example one unless the user opened their own.
   function afterScanLoaded() {
     const f = openState.file;
-    if (f && f.sample && lastIfc === SAMPLE_IFC) markOpen('file', 'L1_C106_IFC.ifc', 'IFC file', 'Example, used for the IFC outline on the scan', { sample: true });
-    else if (f && f.sample) { delete openState.file; drawLoaded(); }
+    if (f && !f.sample && f.kind !== 'Revit file') return;   // the user's own IFC is the one used for the outline
+    delete openState.file;
+    if (lastIfc === SAMPLE_IFC) markOpen('file', 'L1_C106_IFC.ifc', 'IFC file', 'Example, used for the IFC outline on the scan', { sample: true });
+    else drawLoaded();
   }
   async function loadScan(files) {
     const st = $('sstatus'), pw = $('sprogwrap'), pr = $('sprog');
