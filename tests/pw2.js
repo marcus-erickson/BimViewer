@@ -13,11 +13,11 @@ const {chromium}=require('playwright');
  await pg.screenshot({path:'shot_ifc_sample.png',fullPage:true});
  // live load
  await pg.setInputFiles('#file',(process.env.BIM_SAMPLES||'samples')+'/BIM sample/L1_C106_IFC.ifc');
- await pg.waitForFunction(()=>document.getElementById('nowfile').textContent.startsWith('L1_C106_IFC.ifc')||document.getElementById('status').className.includes('err'));
+ await pg.waitForFunction(()=>document.getElementById('loadedline').textContent.includes('L1_C106_IFC.ifc')||document.getElementById('status').className.includes('err'));
  console.log(await pg.textContent('#status'), await pg.textContent('#ecount'));
  await pg.fill('#eq','fire'); console.log('fire filter',await pg.textContent('#ecount'));
  await pg.setInputFiles('#file',(process.env.BIM_SAMPLES||'samples')+'/Revit Sample projects/rstbasicsampleproject.rvt');
- await pg.waitForFunction(()=>document.getElementById('nowfile').textContent.startsWith('rstbasicsampleproject.rvt'));
+ await pg.waitForFunction(()=>document.getElementById('loadedline').textContent.includes('rstbasicsampleproject.rvt'));
  console.log('rvt ok', await pg.textContent('#status'));
  await pg.setViewportSize({width:390,height:800});
  console.log('overflow390', await pg.evaluate(()=>document.documentElement.scrollWidth>document.documentElement.clientWidth));

@@ -121,8 +121,11 @@ details summary { cursor: pointer; font-weight: 500; }
 header .lede { max-width: none; }
 header.loaded .lede { display: none; }
 header.loaded .openrow { margin-top: 10px; }
-.now { font-weight: 600; overflow-wrap: anywhere; }
-.now small { font-weight: 400; color: var(--muted); margin-left: 8px; }
+.loadedline { display: flex; flex-wrap: wrap; gap: 6px 32px; margin-top: 12px; }
+.li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+.lk { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.ln { font-weight: 600; overflow-wrap: anywhere; }
+.ld { color: var(--muted); font-size: 0.9rem; }
 .nav { display: flex; flex-direction: column; gap: 3px; }
 .navtitle { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 2px 8px 6px; overflow-wrap: anywhere; }
 .navbtn { display: flex; justify-content: space-between; align-items: center; gap: 8px; text-align: left; width: 100%; background: transparent; color: var(--fg); border: 0; border-left: 3px solid transparent; border-radius: 4px; padding: 8px 10px; font-weight: 500; }
@@ -165,10 +168,11 @@ tr.det td { background: var(--bg); }
   <header>
     <h1>BIM File Viewer</h1>
     <p class="lede">Open a Revit file (.rvt), an IFC file (.ifc) or a folder of classified scan files and see what is inside, without Revit. Revit files give project details, the thumbnail and the names stored in the model. IFC files give the element list with types, materials and properties, plus a data-readiness audit. Scan folders give measurements, a 3D view with the IFC laid over it, and checks for labels that do not fit. You can also drop a file anywhere on the page. Everything runs in your browser and your files never leave your computer.</p>
+  <div class="loadedline" id="loadedline" hidden></div>
   <div class="openrow" id="openrow">
   <div class="drop" id="drop">
     <div>
-      <strong class="ttl">Open a Revit or IFC file</strong><div class="now" id="nowfile" hidden></div>
+      <strong class="ttl">Open a Revit or IFC file</strong>
       <div class="hint">Drop an .rvt or .ifc file here, or choose one. Very large IFC files can be slow.</div>
     </div>
     <div>
@@ -183,7 +187,7 @@ tr.det td { background: var(--bg); }
 
   <div class="drop" id="scanbox">
     <div style="flex:1 1 320px">
-      <strong class="ttl">Open a scan folder</strong><div class="now" id="nowscan" hidden></div>
+      <strong class="ttl">Open a scan folder</strong>
       <div class="hint">The folder of classified point files (S1, S2 and so on, holding files like chair_1.txt). Read in your browser, never uploaded.</div>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
@@ -885,10 +889,15 @@ tr.det td { background: var(--bg); }
     drawObjs();
   }
 
-  function markOpen(which, name, detail) {
-    const box = $(which === 'scan' ? 'scanbox' : 'drop'), now = $(which === 'scan' ? 'nowscan' : 'nowfile');
-    now.hidden = false; now.innerHTML = esc(name) + (detail ? '<small>' + esc(detail) + '</small>' : '');
-        box.querySelector('.lbl').textContent = which === 'scan' ? 'Choose another scan folder' : 'Choose another file';
+  const openState = {};
+  function markOpen(which, name, kind, detail) {
+    openState[which] = { name, kind, detail };
+    const L = $('loadedline');
+    L.hidden = false;
+    L.innerHTML = ['file', 'scan'].filter(k => openState[k]).map(k => {
+      const o = openState[k];
+      return '<div class="li"><span class="lk">' + esc(o.kind) + '</span><span class="ln">' + esc(o.name) + '</span><span class="ld">' + esc(o.detail) + '</span></div>';
+    }).join('');
     document.querySelector('header').classList.add('loaded');
   }
   async function loadScan(files) {
@@ -908,8 +917,8 @@ tr.det td { background: var(--bg); }
         st.textContent = 'File ' + (p.files + 1) + ' of ' + p.of + ': ' + p.name.split('/').slice(-2).join('/') + '  (' + fmtBytes(p.bytes) + ' of ' + fmtBytes(p.total) + ', ' + Math.round(p.elapsed) + ' s)';
       });
       renderScan(res);
-      markOpen('scan', ((files[0].webkitRelativePath || '').split('/')[0]) || 'Scan folder', 'Scan folder, ' + fmtN(res.objs.length) + ' objects');
-      st.textContent = 'Measured ' + fmtN(res.objs.length) + ' objects in ' + res.seconds.toFixed(1) + ' s';
+      markOpen('scan', ((files[0].webkitRelativePath || '').split('/')[0]) || 'Scan folder', 'Scan folder', fmtN(res.objs.length) + ' objects measured in ' + res.seconds.toFixed(1) + ' s, ' + fmtBytes(files.reduce((a, f) => a + f.size, 0)));
+      st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
     } catch (e) {
@@ -965,7 +974,7 @@ tr.det td { background: var(--bg); }
         const r = IFC.readIfc(text);
         r.fileName = file.name; r.fileSize = file.size;
         renderIfc(r, null);
-        markOpen('file', file.name, 'IFC file, ' + fmtBytes(file.size));
+        markOpen('file', file.name, 'IFC file', fmtBytes(file.size));
         st.textContent = '';
         setTimeout(() => { pw.hidden = true; }, 600);
         window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });
@@ -975,7 +984,7 @@ tr.det td { background: var(--bg); }
       const res = await RVT.parseRvt(buf, file.name, (m, f) => { st.textContent = m; pr.style.width = Math.round(f * 100) + '%'; });
       const vm = RVT.viewModel(res, 0);
       render(vm, null);
-      markOpen('file', file.name, 'Revit file, ' + fmtBytes(file.size));
+      markOpen('file', file.name, 'Revit file', fmtBytes(file.size));
       st.textContent = '';
       setTimeout(() => { pw.hidden = true; }, 600);
       window.scrollTo({ top: $('out').offsetTop - 12, behavior: 'smooth' });

@@ -22,7 +22,7 @@ You do not need Node, Python or Revit to use it. Those are only needed if you ch
 
 ## Using it
 
-The page opens with two buttons under the title: one for a Revit or IFC file, one for a scan folder. You can also drop a file anywhere on the page. Once something is loaded the intro text folds away and the title row shows the name of what you opened, with a "Choose another file" button and the scan folder button beside it. The page below has a menu on the left and one screen at a time on the right. The menu lists the screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
+The page opens with two buttons under the title: one for a Revit or IFC file, one for a scan folder. You can also drop a file anywhere on the page. Once something is loaded the intro text folds away and a line under the title says what is open: the kind (Revit file, IFC file or scan folder), its name, and its size, plus the object count and measuring time for a scan. The two buttons stay in place to open a different file or folder. The page below has a menu on the left and one screen at a time on the right. The menu lists the screens for whatever is loaded, and the page remembers the last screen you used for each kind of file. On a phone the menu sits above the screen and the list of screens scrolls sideways.
 
 | File type | Screens |
 |---|---|
